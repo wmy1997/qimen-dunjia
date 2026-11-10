@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#17131c">
+  <title>奇门遁甲排盘</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="奇门排盘">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
+</head>
+<body>
+  <header class="app-header">
+    <h1>奇门遁甲排盘</h1>
+    <p class="subtitle">问卦 · 起局 · 解读</p>
+  </header>
+
+  <div class="app-toolbar">
+    <button id="btnHistory" class="btn-tool" type="button">📜 历史</button>
+  </div>
+
+  <section class="history u-hidden" id="historyPanel">
+    <div class="history-head">
+      <span class="history-title">历史问卦</span>
+      <span class="history-actions">
+        <button id="btnExportHistory" class="btn-clear" type="button">导出</button>
+        <button id="btnImportHistory" class="btn-clear" type="button">导入</button>
+        <button id="btnClearHistory" class="btn-clear" type="button">清空</button>
+      </span>
+    </div>
+    <input type="file" id="importFile" accept=".json,application/json" class="u-hidden">
+    <div id="historyList" class="history-list"></div>
+  </section>
+
+  <!-- 问卦表单 -->
+  <section class="qiu-form">
+    <div class="qiu-block">
+      <div class="qiu-label">起局方式</div>
+      <div class="qiu-note">正时起局：点击「开始排盘」自动以当前时刻起局（奇门正统）</div>
+    </div>
+
+    <div class="qiu-block">
+      <div class="qiu-label">你的问题（建议填写）</div>
+      <textarea id="question" rows="2" placeholder="例：换工作该去深圳还是厦门好？"></textarea>
+    </div>
+
+    <div class="qiu-block">
+      <div class="qiu-label">补充现状（选填）</div>
+      <textarea id="context" rows="2" placeholder="例：目前岗位 3 年，近期有被裁风险，犹豫是否主动跳…"></textarea>
+    </div>
+
+    <button id="btnCast" class="btn-cast" type="button">开始排盘</button>
+  </section>
+
+  <section class="qiu-summary u-hidden" id="qiuSummary"></section>
+
+  <section class="info-panel">
+    <div id="fourPillars" class="pillars"></div>
+    <div id="juInfo" class="ju"></div>
+    <div id="solarInfo" class="solar"></div>
+    <div id="dutyInfo" class="duty"></div>
+  </section>
+
+  <section id="grid" class="grid"></section>
+
+  <section class="ask-panel">
+    <div class="ask-label">问事</div>
+    <div id="askChips" class="chips"></div>
+  </section>
+
+  <section id="yongshen" class="yongshen"></section>
+
+  <section id="patterns" class="patterns"></section>
+
+  <section class="interp">
+    <div class="interp-head">
+      <button id="btnInterp" class="btn-interp" type="button">🔮 AI 解读</button>
+      <button id="btnSettings" class="btn-settings" type="button">⚙ 设置</button>
+    </div>
+
+    <div class="interp-settings u-hidden" id="interpSettings">
+      <div class="qiu-block">
+        <div class="qiu-label">DeepSeek API Key（仅存本机 localStorage）</div>
+        <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off">
+      </div>
+      <div class="qiu-block">
+        <div class="qiu-label">模型</div>
+        <div class="qiu-radio">
+          <label><input type="radio" name="model" value="deepseek-v4-pro" checked> v4-pro（更强）</label>
+          <label><input type="radio" name="model" value="deepseek-flash"> flash（更省）</label>
+        </div>
+      </div>
+      <div class="qiu-block">
+        <div class="qiu-label">思考模式</div>
+        <div class="qiu-radio">
+          <label><input type="radio" name="thinking" value="enabled" checked> 开启深度思考（high）</label>
+          <label><input type="radio" name="thinking" value="disabled"> 关闭（更快）</label>
+        </div>
+      </div>
+      <p class="interp-tip">Key 由浏览器直连 DeepSeek 官方接口，不经过任何第三方服务器；费用从你的 DeepSeek 余额扣除。</p>
+    </div>
+
+    <div id="interpOut" class="interp-out"></div>
+  </section>
+
+  <footer class="app-footer">
+    排盘内核 <a href="https://github.com/3metaJun/3meta" target="_blank" rel="noopener">3meta</a>（MIT License）· 按北京时间起局 · 仅供自用参考，勿用于非法用途
+  </footer>
+
+  <script src="vendor/3meta.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

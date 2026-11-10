@@ -1,0 +1,63 @@
+# 奇门遁甲排盘（个人自用 PWA）
+
+一款纯前端、免服务器的奇门遁甲问卦排盘小程序。排盘内核复用开源库 [3meta](https://github.com/3metaJun/3meta)（MIT License），AI 解读由浏览器直连 DeepSeek 官方接口（BYOK，自带 Key）。
+
+## 功能
+
+- **正时起局**：点击「开始排盘」自动以当前时刻起局（奇门正统「正时起局」，节气＋阴阳遁＋局数由起局时刻决定）。
+- **问事分类**：综合 / 事业 / 财运 / 婚姻 / 健康 / 学业 / 出行 / 官司 / 寻物，每类自动定位 4 个用神落宫。
+- **九宫盘**：九宫格展示八神 / 九星 / 八门 / 天地盘干 / 暗干 / 地支 / 标记（值符值使 / 空亡 / 驿马 / 击刑 / 门迫 / 入墓 / 吉凶格）。
+- **格局汇总**：五不遇时、门迫门制、吉格、凶格。
+- **AI 解读**：DeepSeek 流式解读（深度思考 + 白话建议），紧扣排盘数据与用神落宫。
+- **历史记录**：自动保存最近 50 条问卦，可回看、重新解读。
+- **PWA**：可安装到手机桌面，离线可用（需 HTTPS 或 localhost）。
+
+## 文件结构
+
+- `index.html` / `style.css` / `app.js` —— 页面与逻辑
+- `vendor/3meta.min.js` —— 3meta 排盘内核（v2.6.0，MIT）
+- `manifest.json` / `sw.js` —— PWA 清单与离线缓存
+- `icon.svg` / `icon-192.png` / `icon-512.png` —— 图标
+- `README.md` / `交叉验证报告.md` / `项目规划书.md` —— 文档
+
+> 部署只需上面的页面/内核/PWA 文件；`node_modules`、`package.json`、`_*.js` 为开发用，可不上传。
+
+## 部署（免费静态托管，推荐）
+
+### 方式一：GitHub Pages
+
+1. 把本目录所有文件推到 GitHub 仓库根目录。
+2. 仓库 Settings → Pages → Source 选 `main` 分支根目录 → Save。
+3. 稍等几分钟，访问 `https://<用户名>.github.io/<仓库名>/`。
+4. 手机浏览器打开 → 「添加到主屏幕」，即可作为 App 使用。
+
+### 方式二：Vercel / Netlify
+
+1. 登录 vercel.com 或 netlify.com，用 GitHub 导入仓库。
+2. 框架选「Other / 静态站点」，构建命令留空，输出目录填 `.`（根目录）。
+3. 部署后获得 `https://xxx.vercel.app`（自带 HTTPS）。
+
+### 本地预览
+
+```bash
+python3 -m http.server 8000   # 访问 http://localhost:8000（Service Worker 可注册）
+```
+
+> 直接双击 `index.html`（file://）也能看排盘，但 Service Worker 不注册、无法安装 PWA。
+
+## 使用
+
+1. 点 ⚙「设置」，填入 DeepSeek API Key（在 platform.deepseek.com 创建，仅存本机 localStorage）。
+2. 填写问题（建议）、补充现状（选填），点「开始排盘」。
+3. 选「问事」分类查看用神落宫，点「🔮 AI 解读」获取白话建议。
+4. 点「📜 历史」回看历史问卦。
+
+> **模型选择**：默认 `v4-pro`（深度思考，解读更准，推荐）；`flash` 更省额度，适合高频简单提问。
+
+## 说明
+
+- **起局口径**：奇门遁甲正统「正时起局」——以点击排盘时刻的节气定阴阳遁与局数，四柱由该时刻决定；问题与现状只参与解读、不参与排盘。
+- **隐私与费用**：API Key 仅存本机 localStorage，浏览器直连 `api.deepseek.com`，不经过任何第三方服务器；费用从你的 DeepSeek 余额扣除。
+- **排盘内核**：[3meta](https://github.com/3metaJun/3meta)（MIT License），本项目仅自用，未修改内核源码。
+- **验证**：起局排盘 / 用神格局 / 解读建议三层已通过交叉验证（金标准向量 + 独立库 taibu-core 对照），详见 `交叉验证报告.md`。
+- **免责**：仅供自用参考，不构成任何决策建议。

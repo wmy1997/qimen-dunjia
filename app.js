@@ -195,7 +195,8 @@
       '<span class="pillar">' + fp.hour.stem + fp.hour.branch + '时</span>';
 
     document.getElementById('juInfo').innerHTML =
-      '<strong>' + ju.type + ju.number + '局</strong> · ' + chart.yuan + ' · ' + (chart.season || '');
+      '<div class="ju-badge">' + ju.type + ju.number + '局</div>' +
+      '<div class="ju-sub">' + chart.yuan + ' · ' + (chart.season || '') + '</div>';
 
     document.getElementById('solarInfo').textContent =
       t.solarDate + '（' + t.lunarDate + '）' +
@@ -909,10 +910,26 @@
     if (btnI) btnI.addEventListener('click', startInterpretation);
   }
 
+  function initAutoGrow() {
+    ['question', 'context'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      autoGrowTextarea(el);
+      el.addEventListener('input', function () { autoGrowTextarea(el); });
+    });
+  }
+
+  function autoGrowTextarea(el) {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }
+
   function init() {
     renderAskChips();
     initSettings();
     initHistory();
+    initAutoGrow();
     buildChart(new Date());
 
     document.getElementById('btnCast').addEventListener('click', castDivination);

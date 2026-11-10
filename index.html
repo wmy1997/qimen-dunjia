@@ -86,6 +86,15 @@
       <div class="qiu-block">
         <div class="qiu-label">DeepSeek API Key（仅存本机 localStorage）</div>
         <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off">
+        <div class="key-row">
+          <button id="btnSaveKey" class="btn-key" type="button">💾 保存</button>
+          <span id="keyStatus" class="key-status"></span>
+        </div>
+        <div class="key-row">
+          <button id="btnExportKey" class="btn-key" type="button">导出备份</button>
+          <button id="btnImportKey" class="btn-key" type="button">导入备份</button>
+        </div>
+        <textarea id="keyBackup" class="key-backup u-hidden" rows="3" placeholder="点「导出备份」生成；粘贴备份内容后点「导入备份」"></textarea>
       </div>
       <div class="qiu-block">
         <div class="qiu-label">模型</div>

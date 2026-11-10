@@ -254,3 +254,19 @@ textarea:focus, .qiu-time input:focus { outline: none; border-color: var(--gold)
 
 /* iOS Safari 聚焦输入框会按控件字号自动放大页面：所有表单控件字号必须 >= 16px */
 input, textarea, select { font-size: 16px; }
+
+/* API Key 保存状态 / 备份导入导出 */
+.key-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.btn-key {
+  background: #fffdf7; border: 1px solid var(--border); color: var(--text);
+  border-radius: 999px; padding: 6px 14px; font-size: 14px; cursor: pointer;
+}
+.btn-key:active { background: #f3ece0; }
+.key-status { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.key-status.ok { color: var(--green); }
+.key-status.err { color: var(--red); }
+.key-backup {
+  width: 100%; box-sizing: border-box; margin-top: 8px; padding: 8px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: #fffdf7; color: var(--text); resize: vertical; min-height: 64px;
+}

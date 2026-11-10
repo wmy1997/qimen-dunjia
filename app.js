@@ -645,7 +645,81 @@
   }
 
   function saveSettings(s) {
-    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch (e) {}
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); return true; }
+    catch (e) { return false; }
+  }
+
+  function applySettingsToUI(s) {
+    var ak = document.getElementById('apiKey');
+    if (ak) ak.value = s.apiKey || '';
+    var modelRadios = document.querySelectorAll('input[name="model"]');
+    for (var i = 0; i < modelRadios.length; i++) modelRadios[i].checked = (modelRadios[i].value === s.model);
+    var thinkRadios = document.querySelectorAll('input[name="thinking"]');
+    for (var j = 0; j < thinkRadios.length; j++) thinkRadios[j].checked = (thinkRadios[j].value === s.thinking);
+  }
+
+  function refreshKeyStatus(flash) {
+    var el = document.getElementById('keyStatus');
+    if (!el) return;
+    var s = loadSettings();
+    if (s.apiKey) {
+      el.textContent = flash ? '✅ 已保存到本机' : '已保存到本机';
+      el.className = 'key-status ok';
+    } else {
+      var standalone = (window.navigator.standalone === true) ||
+        (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+      el.textContent = standalone
+        ? '未保存（主屏 App 与 Safari 存储独立，请在当前入口填写一次）'
+        : '未保存';
+      el.className = 'key-status';
+    }
+  }
+
+  function saveKeyFromInput(flash) {
+    var ak = document.getElementById('apiKey');
+    if (!ak) return;
+    var cur = loadSettings();
+    cur.apiKey = ak.value.trim();
+    var ok = saveSettings(cur);
+    var el = document.getElementById('keyStatus');
+    if (!ok && el) {
+      el.textContent = '⚠️ 保存失败（浏览器禁止本地存储，请勿用无痕模式）';
+      el.className = 'key-status err';
+      return;
+    }
+    refreshKeyStatus(flash);
+  }
+
+  function exportKeyBackup() {
+    var ta = document.getElementById('keyBackup');
+    if (!ta) return;
+    var s = loadSettings();
+    ta.value = JSON.stringify(s);
+    ta.classList.remove('u-hidden');
+    ta.focus();
+    try { ta.select(); } catch (e) {}
+    try { if (navigator.clipboard) navigator.clipboard.writeText(ta.value); } catch (e) {}
+  }
+
+  function importKeyBackup() {
+    var ta = document.getElementById('keyBackup');
+    var el = document.getElementById('keyStatus');
+    if (!ta) return;
+    var txt = (ta.value || '').trim();
+    if (!txt) { if (el) { el.textContent = '请先粘贴备份内容'; el.className = 'key-status'; } return; }
+    try {
+      var s = JSON.parse(txt);
+      if (!s || typeof s !== 'object' || !s.apiKey) throw new Error('bad');
+      var cur = loadSettings();
+      cur.apiKey = String(s.apiKey);
+      cur.model = (s.model === 'deepseek-flash') ? 'deepseek-flash' : 'deepseek-v4-pro';
+      cur.thinking = (s.thinking === 'disabled') ? 'disabled' : 'enabled';
+      if (!saveSettings(cur)) throw new Error('storage');
+      applySettingsToUI(cur);
+      if (el) { el.textContent = '✅ 已导入并保存'; el.className = 'key-status ok'; }
+    } catch (e) {
+      if (el) { el.textContent = '导入失败：备份格式不正确'; el.className = 'key-status err'; }
+    }
   }
 
   function palaceBrief(chart, p) {
@@ -877,12 +951,15 @@
     var ak = document.getElementById('apiKey');
     if (ak) {
       ak.value = s.apiKey;
-      ak.addEventListener('input', function () {
-        var cur = loadSettings();
-        cur.apiKey = ak.value.trim();
-        saveSettings(cur);
-      });
+      ak.addEventListener('input', function () { saveKeyFromInput(false); });
+      ak.addEventListener('change', function () { saveKeyFromInput(true); });
     }
+    var btnSaveKey = document.getElementById('btnSaveKey');
+    if (btnSaveKey) btnSaveKey.addEventListener('click', function () { saveKeyFromInput(true); });
+    var btnExportKey = document.getElementById('btnExportKey');
+    if (btnExportKey) btnExportKey.addEventListener('click', exportKeyBackup);
+    var btnImportKey = document.getElementById('btnImportKey');
+    if (btnImportKey) btnImportKey.addEventListener('click', importKeyBackup);
     var modelRadios = document.querySelectorAll('input[name="model"]');
     for (var i = 0; i < modelRadios.length; i++) {
       modelRadios[i].checked = (modelRadios[i].value === s.model);
@@ -908,6 +985,7 @@
     });
     var btnI = document.getElementById('btnInterp');
     if (btnI) btnI.addEventListener('click', startInterpretation);
+    refreshKeyStatus(false);
   }
 
   function initAutoGrow() {

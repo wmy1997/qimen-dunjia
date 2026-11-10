@@ -1,5 +1,5 @@
 // 奇门排盘 Service Worker —— 离线缓存应用壳（仅 http(s)/localhost 生效，file:// 不注册）
-var CACHE = 'qimen-v3';
+var CACHE = 'qimen-v4';
 var ASSETS = [
   './',
   './index.html',

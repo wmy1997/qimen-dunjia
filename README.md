@@ -18,7 +18,7 @@
 
 - `index.html` / `style.css` / `app.js` —— 页面与逻辑
 - `rules.js` —— 神煞与应期规则引擎（自实现，表口径参考 atopx/qimen 的 MIT 神煞表）
-- `vendor/3meta.min.js` —— 3meta 排盘内核（v2.6.0，MIT）
+- `vendor/3meta.min.js` —— 3meta 排盘内核（v2.6.0，MIT）；已按业界主流口径打两处补丁：值使门从「真实旬首宫」起数、落中五一律寄坤二（原版为中五→坤二起数、阳遁落中五→艮八），其余逻辑未改动，补丁后与 taibu-core / atopx / qfdk 三库逐盘一致
 - `manifest.json` / `sw.js` —— PWA 清单与离线缓存
 - `icon.svg` / `icon-192.png` / `icon-512.png` —— 图标
 - `README.md` / `交叉验证报告.md` / `项目规划书.md` —— 文档

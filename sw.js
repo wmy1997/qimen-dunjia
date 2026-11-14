@@ -1,11 +1,13 @@
-// 奇门排盘 Service Worker —— 离线缓存应用壳（仅 http(s)/localhost 生效，file:// 不注册）
-var CACHE = 'qimen-v8';
+// 六爻 · 奇门排盘 Service Worker —— 离线缓存应用壳（仅 http(s)/localhost 生效，file:// 不注册）
+var CACHE = 'qimen-v9';
 var ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
   './rules.js',
+  './liuyao.js',
+  './vendor/liuyao.min.js',
   './vendor/3meta.min.js',
   './manifest.json',
   './icon.svg',

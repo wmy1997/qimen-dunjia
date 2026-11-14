@@ -352,3 +352,122 @@ input, textarea, select { font-size: 16px; }
   border-top: 1px dashed var(--border);
   padding-top: 6px;
 }
+
+/* ============ 体系选择（六爻 / 奇门） ============ */
+.sys-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.sys-card {
+  position: relative; text-align: left; padding: 10px 11px 11px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  color: var(--text); font-family: inherit; cursor: pointer; transition: border-color .15s, box-shadow .15s;
+}
+.sys-card.active { border-color: var(--gold); box-shadow: inset 0 0 0 1px rgba(169,126,58,.35); background: #fffaf0; }
+.sys-name { display: block; font-size: 15px; font-weight: 700; letter-spacing: 2px; color: var(--gold); }
+.sys-desc { display: block; font-size: 11px; line-height: 1.5; color: var(--muted); margin-top: 3px; }
+.sys-rec {
+  position: absolute; top: -7px; right: 8px; font-size: 10px; padding: 1px 6px;
+  background: var(--green); color: #fff; border-radius: 8px; letter-spacing: 1px;
+}
+.sys-hint {
+  margin-top: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.6;
+  background: #fdf6e6; border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+}
+.sys-hint b { color: var(--gold); }
+.link-btn {
+  background: none; border: none; padding: 0 0 0 4px; font: inherit; font-size: 12px;
+  color: var(--gold); text-decoration: underline; cursor: pointer;
+}
+
+/* ============ 摇卦区 ============ */
+.cast-block { margin-bottom: 12px; }
+.cast-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.cast-actions .btn-cast { flex: 1 1 140px; }
+.btn-ghost {
+  flex: 0 0 auto; padding: 11px 14px; border-radius: 10px; font-size: 13px; font-family: inherit;
+  background: transparent; color: var(--gold); border: 1px solid var(--gold); cursor: pointer;
+}
+.btn-ghost:disabled { opacity: .45; }
+.yao-slots { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.yao-slot {
+  display: flex; align-items: center; gap: 10px; padding: 9px 11px;
+  background: var(--cell); border: 1px dashed var(--border); border-radius: 9px;
+  min-height: 42px; transition: border-color .2s, background .2s;
+}
+.yao-slot.filled { border-style: solid; background: var(--panel); }
+.yao-slot.active { border-color: var(--gold); background: #fdf6e6; }
+.yao-slot.moving { border-color: var(--red); }
+.yao-pos { font-size: 12px; color: var(--muted); letter-spacing: 1px; width: 40px; flex: 0 0 auto; }
+.yao-wait { font-size: 12px; color: var(--muted); }
+.yao-val { font-size: 13px; color: var(--gold); font-weight: 700; }
+.coin { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; font-size: 12px; background: #f3ece0; color: var(--text); }
+.coin.yang { background: var(--gold); color: #fff8ea; }
+.coin.rolling { background: #f3ece0; color: var(--gold); font-size: 12px; padding: 3px 8px; border-radius: 8px; }
+.manual-box { margin-top: 10px; padding: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
+.manual-title { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.manual-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.manual-row span { font-size: 12px; color: var(--muted); width: 34px; }
+.manual-row select,
+.manual-row select:focus {
+  flex: 1; font-size: 16px; padding: 6px 8px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--cell); color: var(--text); font-family: inherit;
+}
+.manual-box .btn-cast { width: 100%; margin-top: 6px; }
+
+/* 阴阳爻符号 */
+.ly-bar { display: inline-block; width: 62px; height: 7px; border-radius: 2px; background: var(--gold); flex: 0 0 auto; }
+.ly-bar.yin { background: linear-gradient(90deg, var(--gold) 0 43%, transparent 43% 57%, var(--gold) 57% 100%); }
+
+/* ============ 六爻结果 ============ */
+.liuyao-view { margin-bottom: 16px; }
+.ly-head { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+.ly-name { font-size: 17px; font-weight: 700; color: var(--gold); letter-spacing: 2px; }
+.ly-gong { font-size: 12px; color: var(--muted); margin-left: 8px; letter-spacing: 0; font-weight: 400; }
+.ly-change { font-size: 13px; margin-top: 5px; color: var(--text); }
+.ly-meta { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.6; }
+.ly-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.ly-badge { font-size: 11px; padding: 2px 7px; border-radius: 8px; background: #f3ece0; color: var(--gold); border: 1px solid var(--border); }
+.ly-brief { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.6; }
+.ly-table { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
+.ly-row { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.ly-row:last-child { border-bottom: none; }
+.ly-row.is-moving { background: #fdf6e6; }
+.ly-row-main { display: flex; align-items: center; gap: 7px; }
+.ly-shen { width: 32px; flex: 0 0 auto; font-size: 11px; color: var(--muted); }
+.ly-qin { width: 38px; flex: 0 0 auto; font-size: 13px; color: var(--gold); font-weight: 600; }
+.ly-gan { width: 54px; flex: 0 0 auto; font-size: 12px; color: var(--earth); }
+.ly-move { width: 14px; flex: 0 0 auto; font-size: 13px; color: var(--red); text-align: center; }
+.ly-pos-tags { width: 30px; flex: 0 0 auto; display: flex; gap: 3px; }
+.ly-pos-tag { font-size: 10px; padding: 0 3px; border-radius: 4px; background: #f3ece0; color: var(--muted); }
+.ly-pos-tag.shi { background: var(--gold); color: #fff8ea; }
+.ly-pos-tag.ying { background: var(--earth); color: #fff; }
+.ly-ev { font-size: 11px; color: var(--muted); margin: 4px 0 0 32px; line-height: 1.5; }
+.ly-sub { font-size: 11px; color: var(--muted); margin: 4px 0 0 32px; line-height: 1.5; }
+.ly-changed { color: var(--earth); }
+.ly-fu-label { color: var(--gold); margin-right: 3px; }
+.ly-tiny { font-size: 10px; color: var(--red); }
+
+.ly-section { margin-bottom: 14px; }
+.ly-sec-title { font-size: 13px; color: var(--gold); letter-spacing: 2px; margin-bottom: 8px; padding-left: 2px; }
+.ly-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 11px; margin-bottom: 8px; }
+.ly-card-head { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 5px; }
+.ly-card-line { font-size: 12px; line-height: 1.7; color: var(--text); }
+.ly-card-line.ly-dim { color: var(--muted); font-size: 11px; }
+.ly-cand { font-size: 11px; color: var(--muted); margin-top: 5px; line-height: 1.6; }
+.ly-tag { font-size: 11px; padding: 1px 6px; border-radius: 6px; background: #f3ece0; color: var(--muted); }
+.ly-tag-good { background: #e8f2ea; color: var(--green); }
+.ly-tag-bad { background: #f8eaea; color: var(--red); }
+.ly-tag-mid { background: #f3ece0; color: var(--muted); }
+.ly-note { font-size: 11px; color: var(--muted); line-height: 1.6; padding: 2px 2px 0; }
+.ly-empty, .ly-loading, .ly-err {
+  background: var(--panel); border: 1px dashed var(--border); border-radius: 10px;
+  padding: 25px 16px; text-align: center; font-size: 12px; color: var(--muted); line-height: 1.8;
+}
+.ly-err { color: var(--red); border-color: #e2c4c4; }
+.ly-details { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 11px; }
+.ly-details summary { font-size: 13px; color: var(--gold); cursor: pointer; outline: none; }
+.ly-details .ly-card-line { margin-top: 6px; }
+
+/* 历史记录：体系标签 */
+.hist-sys {
+  display: inline-block; font-size: 10px; padding: 0 4px; border-radius: 4px;
+  background: #f3ece0; color: var(--gold); margin-right: 5px;
+}

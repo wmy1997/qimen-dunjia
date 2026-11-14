@@ -39,6 +39,10 @@
   var currentQuestion = '';
   var currentContext = '';
   var currentHistoryId = null; // 当前问卦在历史记录里的 id（未保存为 null）
+  var currentSystem = 'liuyao'; // 当前体系：liuyao（六爻）| qimen（奇门）
+  var currentGender = '';       // 六爻婚姻类用神取法：''（不限）| male | female
+  var currentLiuyao = null;     // 六爻最近一次装卦结果（taibu 输出）
+  var currentYaoValues = [];    // 六爻最近一次摇出的六爻值
   var currentShenSha = [];     // 本次盘的神煞列表
   var currentSSByPalace = {};  // 神煞按宫分组
   var currentYingqi = null;    // 本次盘的应期推算
@@ -446,7 +450,9 @@
           var kids = box.children;
           for (var j = 0; j < kids.length; j++) kids[j].className = 'chip';
           el.className = 'chip active';
-          if (currentChart) { renderYongShen(currentChart); renderYingqi(currentChart); }
+          syncGenderWrap();
+          if (currentSystem === 'qimen' && currentChart) { renderYongShen(currentChart); renderYingqi(currentChart); }
+          if (currentSystem === 'liuyao' && currentLiuyao && window.QimenLiuyao) window.QimenLiuyao.recastAnalysis();
           if (currentHistoryId) updateHistoryEntry(currentHistoryId, { category: cat });
         });
       })(ASK_CATEGORIES[i], chip);
@@ -454,11 +460,125 @@
     }
   }
 
+  // —— 体系切换（六爻 / 奇门）——
+  function syncGenderWrap() {
+    var w = document.getElementById('lyGenderWrap');
+    if (w) w.classList.toggle('u-hidden', !(currentSystem === 'liuyao' && currentCategory === '婚姻'));
+  }
+
+  function setSystem(sys, silent) {
+    currentSystem = (sys === 'qimen') ? 'qimen' : 'liuyao';
+    var cards = document.querySelectorAll('.sys-card');
+    for (var i = 0; i < cards.length; i++) {
+      cards[i].classList.toggle('active', cards[i].getAttribute('data-sys') === currentSystem);
+    }
+    var pairs = [
+      ['liuyaoCast', currentSystem === 'liuyao'],
+      ['qimenCast', currentSystem === 'qimen'],
+      ['liuyaoView', currentSystem === 'liuyao'],
+      ['qimenView', currentSystem === 'qimen']
+    ];
+    for (var j = 0; j < pairs.length; j++) {
+      var el = document.getElementById(pairs[j][0]);
+      if (el) el.classList.toggle('u-hidden', !pairs[j][1]);
+    }
+    syncGenderWrap();
+    if (!silent) {
+      var out = document.getElementById('interpOut');
+      if (out) out.innerHTML = '';
+    }
+  }
+
+  // 问题类型 → 体系建议（规则化判断，即时给出，不调模型）
+  var ADVISE_RULES = [
+    { sys: 'qimen', why: '涉及多个选项或城市/方位的取舍，奇门九宫格局更适合比优劣、看形势',
+      kw: ['还是', '要不要去', '该去', '哪个', '哪一个', '对比', '优劣', '取舍', '换城市', '深圳', '厦门', '方向', '方位', '布局', '择日'] },
+    { sys: 'liuyao', why: '问何时、问应期，六爻的应期体系最细（冲空填实、值日值月）',
+      kw: ['什么时候', '何时', '几时', '多久', '哪天', '多久能', '应期', '时间点'] },
+    { sys: 'liuyao', why: '问单件事的成败有无，六爻一问一断最直接',
+      kw: ['会不会', '能不能', '成不成', '有没有', '是不是', '能否', '可否', '是否能', '顺利吗', '有希望'] },
+    { sys: 'qimen', why: '问整体态势、局势判断与建议，奇门看大势与主客更完整',
+      kw: ['局势', '形势', '大局', '趋势', '整体', '该怎么办', '如何应对'] }
+  ];
+
+  function updateSysAdvice(text) {
+    var hint = document.getElementById('sysHint');
+    var recs = document.querySelectorAll('.sys-rec');
+    for (var i = 0; i < recs.length; i++) recs[i].classList.add('u-hidden');
+    if (!hint) return;
+    var t = (text || '').trim();
+    if (!t) { hint.classList.add('u-hidden'); hint.innerHTML = ''; return; }
+    var pick = null;
+    for (var r = 0; r < ADVISE_RULES.length && !pick; r++) {
+      for (var k = 0; k < ADVISE_RULES[r].kw.length; k++) {
+        if (t.indexOf(ADVISE_RULES[r].kw[k]) >= 0) { pick = ADVISE_RULES[r]; break; }
+      }
+    }
+    if (!pick) { hint.classList.add('u-hidden'); hint.innerHTML = ''; return; }
+    var name = pick.sys === 'liuyao' ? '六爻' : '奇门';
+    hint.innerHTML = '这类问题更适合 <b>' + name + '</b>：' + pick.why +
+      '。<button type="button" class="link-btn" data-goto="' + pick.sys + '">切到' + name + '</button>';
+    hint.classList.remove('u-hidden');
+    var badge = document.querySelector('.sys-card[data-sys="' + pick.sys + '"] .sys-rec');
+    if (badge) badge.classList.remove('u-hidden');
+  }
+
+  function initSystemTabs() {
+    var tabs = document.getElementById('sysTabs');
+    if (tabs) tabs.addEventListener('click', function (ev) {
+      var card = ev.target.closest('.sys-card');
+      if (card) setSystem(card.getAttribute('data-sys'));
+    });
+    var hint = document.getElementById('sysHint');
+    if (hint) hint.addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-goto]');
+      if (b) setSystem(b.getAttribute('data-goto'));
+    });
+    var q = document.getElementById('question');
+    if (q) q.addEventListener('input', function () { updateSysAdvice(q.value); });
+    setSystem('liuyao', true);
+  }
+
+  // —— 六爻装卦完成回调（liuyao.js 调用）——
+  function handleLiuyaoCast(params, out) {
+    var qEl = document.getElementById('question');
+    var cEl = document.getElementById('context');
+    currentQuestion = qEl ? qEl.value.trim() : '';
+    currentContext = cEl ? cEl.value.trim() : '';
+    currentGender = params.gender || '';
+    currentLiuyao = out;
+    currentYaoValues = (params.yaoValues || []).slice();
+    renderQiuSummary();
+
+    var interpOut = document.getElementById('interpOut');
+    if (interpOut) interpOut.innerHTML = '';
+
+    var entry = {
+      id: Date.now(),
+      ts: new Date(params.date).getTime(),
+      system: 'liuyao',
+      question: currentQuestion,
+      context: currentContext,
+      category: params.category,
+      gender: currentGender,
+      yaoValues: currentYaoValues,
+      hexagram: out.hexagramName,
+      changed: out.changedHexagramName || '',
+      interp: null
+    };
+    currentHistoryId = entry.id;
+    addHistoryEntry(entry);
+    renderHistoryList();
+
+    var view = document.getElementById('liuyaoView');
+    if (view) view.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   function renderQiuSummary() {
     var box = document.getElementById('qiuSummary');
     if (!box) return;
     var tags = [];
-    tags.push('时间起局');
+    tags.push(currentSystem === 'liuyao' ? '六爻 · 摇卦' : '奇门 · 时间起局');
     if (currentQuestion) tags.push('问：' + currentQuestion);
     if (currentContext) tags.push('补充：' + currentContext);
     if (tags.length) {
@@ -489,6 +609,7 @@
     var entry = {
       id: Date.now(),
       ts: d.getTime(),
+      system: 'qimen',
       question: currentQuestion,
       context: currentContext,
       category: currentCategory,
@@ -545,9 +666,14 @@
     var d = new Date(e.ts);
     var time = pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
     var title = e.question || (e.category || '综合') + '类问事';
+    var isLY = e.system === 'liuyao';
+    var sub = isLY
+      ? ((e.hexagram || '') + (e.changed ? ' → ' + e.changed : ''))
+      : (e.ju || '');
     return '<button class="hist-item" type="button" data-id="' + e.id + '">' +
       '<div class="hist-title">' + esc(title) + (e.interp ? '<span class="hist-tag">已解读</span>' : '') + '</div>' +
-      '<div class="hist-meta">' + time + ' · ' + (e.ju || '') + '</div>' +
+      '<div class="hist-meta"><span class="hist-sys">' + (isLY ? '六爻' : '奇门') + '</span>' +
+        time + ' · ' + esc(sub) + '</div>' +
       '</button>';
   }
 
@@ -574,6 +700,15 @@
     }
   }
 
+  function restoreInterp(e) {
+    var out = document.getElementById('interpOut');
+    if (!out) return;
+    out.innerHTML = e.interp
+      ? '<details class="reason-box" open><summary>深度思考过程</summary><div class="reason-body">' + esc(e.interp.reasoning || '') + '</div></details>' +
+        '<div class="answer-box">' + mdToHtml(e.interp.answer || '') + '</div>'
+      : '';
+  }
+
   function loadHistoryEntry(id) {
     var arr = loadHistory();
     var e = null;
@@ -584,26 +719,40 @@
     currentQuestion = e.question || '';
     currentContext = e.context || '';
     currentCategory = e.category || '综合';
+    currentGender = e.gender || '';
 
     document.getElementById('question').value = currentQuestion;
     document.getElementById('context').value = currentContext;
     setCategoryChip(currentCategory);
 
-    // 用保存的起局时刻重排盘（奇门排盘确定性：同时刻→同盘）
+    var isLY = e.system === 'liuyao';
+    setSystem(isLY ? 'liuyao' : 'qimen', true);
+    syncGenderWrap();
+
+    if (isLY) {
+      var gEl = document.querySelector('input[name="lyGender"][value="' + currentGender + '"]');
+      if (gEl) gEl.checked = true;
+      if (window.QimenLiuyao) {
+        window.QimenLiuyao.loadEntry(e).then(function (out) {
+          currentLiuyao = out;
+          currentYaoValues = (e.yaoValues || []).slice();
+          restoreInterp(e);
+          document.getElementById('historyPanel').classList.add('u-hidden');
+          var v = document.getElementById('liuyaoView');
+          if (v) v.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      }
+      renderQiuSummary();
+      return;
+    }
+
+    // 奇门：用保存的起局时刻重排盘（排盘确定性：同时刻→同盘）
     var d = new Date(e.ts);
     currentChart = ThreeMeta.QimenChart.fromSolar(
       d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds());
     render(currentChart);
     renderQiuSummary();
-
-    // 恢复解读（若有）
-    var out = document.getElementById('interpOut');
-    if (out) {
-      out.innerHTML = e.interp
-        ? '<details class="reason-box" open><summary>深度思考过程</summary><div class="reason-body">' + esc(e.interp.reasoning || '') + '</div></details>' +
-          '<div class="answer-box">' + mdToHtml(e.interp.answer || '') + '</div>'
-        : '';
-    }
+    restoreInterp(e);
 
     document.getElementById('historyPanel').classList.add('u-hidden');
     var panel = document.querySelector('.info-panel');
@@ -989,9 +1138,17 @@
       out.innerHTML = '<div class="interp-msg">请先在上方「设置」里填入 DeepSeek API Key（仅存本机）</div>';
       return;
     }
-    if (!currentChart) return;
+    var isLY = currentSystem === 'liuyao';
+    if (isLY && !currentLiuyao) {
+      out.innerHTML = '<div class="interp-msg">请先摇卦成卦，再让 AI 解读</div>';
+      return;
+    }
+    if (!isLY && !currentChart) return;
 
-    var prompt = buildInterpretPrompt(currentChart, currentQuestion, currentContext, currentCategory);
+    var prompt = isLY && window.QimenLiuyao
+      ? window.QimenLiuyao.buildPrompt(currentLiuyao, currentQuestion, currentContext, currentCategory, currentGender)
+      : buildInterpretPrompt(currentChart, currentQuestion, currentContext, currentCategory);
+    var sysPrompt = isLY && window.QimenLiuyao ? window.QimenLiuyao.SYSTEM_PROMPT : SYSTEM_PROMPT;
     if (btnI) { btnI.disabled = true; btnI.textContent = '🔮 解读中…'; }
     out.innerHTML =
       '<details class="reason-box" open><summary>深度思考过程</summary><div class="reason-body" id="reasonBody"></div></details>' +
@@ -1017,7 +1174,7 @@
     }
 
     callDeepSeek(s.apiKey, s.model, s.thinking,
-      [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: prompt }],
+      [{ role: 'system', content: sysPrompt }, { role: 'user', content: prompt }],
       function (rt) {
         markStarted();
         reasonBuf += rt;
@@ -1110,10 +1267,27 @@
   }
 
   function init() {
+    window.QimenApp = {
+      getQuestion: function () {
+        var q = document.getElementById('question');
+        return q ? q.value.trim() : '';
+      },
+      getContext: function () {
+        var c = document.getElementById('context');
+        return c ? c.value.trim() : '';
+      },
+      getCategory: function () { return currentCategory; },
+      getGender: function () { return currentGender; }
+    };
+
     renderAskChips();
+    initSystemTabs();
     initSettings();
     initHistory();
     initAutoGrow();
+
+    if (window.QimenLiuyao) window.QimenLiuyao.init({ onCast: handleLiuyaoCast });
+
     buildChart(new Date());
 
     document.getElementById('btnCast').addEventListener('click', castDivination);

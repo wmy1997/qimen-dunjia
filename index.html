@@ -4,18 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f6f1e8">
-  <title>奇门遁甲排盘</title>
+  <title>六爻 · 奇门 排盘</title>
   <link rel="stylesheet" href="style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="奇门排盘">
+  <meta name="apple-mobile-web-app-title" content="六爻奇门">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-192.png">
 </head>
 <body>
   <header class="app-header">
-    <h1>奇门遁甲排盘</h1>
+    <h1>六爻 · 奇门</h1>
     <p class="subtitle">问卦 · 起局 · 解读</p>
   </header>
 
@@ -36,16 +36,25 @@
     <div id="historyList" class="history-list"></div>
   </section>
 
-  <!-- 问卦表单 -->
+  <!-- 问卦入口 -->
   <section class="qiu-form">
     <div class="qiu-block">
-      <div class="qiu-label">起局方式</div>
-      <div class="qiu-note">正时起局：点击「开始排盘」自动以当前时刻起局（奇门正统）</div>
+      <div class="qiu-label">你想问什么</div>
+      <textarea id="question" rows="2" placeholder="例：这周内会不会有面试通知？　或：换城市该去深圳还是厦门？"></textarea>
+      <div id="sysHint" class="sys-hint u-hidden"></div>
     </div>
 
-    <div class="qiu-block">
-      <div class="qiu-label">你的问题（建议填写）</div>
-      <textarea id="question" rows="2" placeholder="例：换工作该去深圳还是厦门好？"></textarea>
+    <div class="sys-tabs" id="sysTabs">
+      <button class="sys-card active" type="button" data-sys="liuyao">
+        <span class="sys-name">六爻</span>
+        <span class="sys-desc">一问一断 · 看具体事成败与应期</span>
+        <span class="sys-rec u-hidden">推荐</span>
+      </button>
+      <button class="sys-card" type="button" data-sys="qimen">
+        <span class="sys-name">奇门</span>
+        <span class="sys-desc">时空格局 · 看取舍方位与整体态势</span>
+        <span class="sys-rec u-hidden">推荐</span>
+      </button>
     </div>
 
     <div class="qiu-block">
@@ -53,30 +62,57 @@
       <textarea id="context" rows="2" placeholder="例：目前岗位 3 年，近期有被裁风险，犹豫是否主动跳…"></textarea>
     </div>
 
-    <button id="btnCast" class="btn-cast" type="button">开始排盘</button>
+    <div class="qiu-block">
+      <div class="qiu-label">问事</div>
+      <div id="askChips" class="chips"></div>
+      <div id="lyGenderWrap" class="qiu-radio u-hidden">
+        <label><input type="radio" name="lyGender" value="" checked> 不限</label>
+        <label><input type="radio" name="lyGender" value="male"> 男（以妻财为用）</label>
+        <label><input type="radio" name="lyGender" value="female"> 女（以官鬼为用）</label>
+      </div>
+    </div>
+
+    <!-- 六爻：摇卦 -->
+    <div id="liuyaoCast" class="cast-block">
+      <div class="qiu-note">三枚铜钱，自下而上摇六次；背为阳、字为阴。初爻→上爻依次成卦。</div>
+      <div id="yaoSlots" class="yao-slots"></div>
+      <div class="cast-actions">
+        <button id="btnShake" class="btn-cast" type="button">摇 第 1 爻</button>
+        <button id="btnQuickCast" class="btn-ghost" type="button">一键摇完</button>
+        <button id="btnManualCast" class="btn-ghost" type="button">手动录入</button>
+      </div>
+      <div id="manualBox" class="manual-box u-hidden"></div>
+    </div>
+
+    <!-- 奇门：正时起局 -->
+    <div id="qimenCast" class="cast-block u-hidden">
+      <div class="qiu-note">正时起局：点击「开始排盘」自动以当前时刻起局（奇门正统）</div>
+      <button id="btnCast" class="btn-cast" type="button">开始排盘</button>
+    </div>
   </section>
 
   <section class="qiu-summary u-hidden" id="qiuSummary"></section>
 
-  <section class="info-panel">
-    <div id="fourPillars" class="pillars"></div>
-    <div id="juInfo" class="ju"></div>
-    <div id="solarInfo" class="solar"></div>
-    <div id="dutyInfo" class="duty"></div>
-  </section>
+  <!-- 奇门结果 -->
+  <div id="qimenView">
+    <section class="info-panel">
+      <div id="fourPillars" class="pillars"></div>
+      <div id="juInfo" class="ju"></div>
+      <div id="solarInfo" class="solar"></div>
+      <div id="dutyInfo" class="duty"></div>
+    </section>
 
-  <section id="grid" class="grid"></section>
+    <section id="grid" class="grid"></section>
 
-  <section class="ask-panel">
-    <div class="ask-label">问事</div>
-    <div id="askChips" class="chips"></div>
-  </section>
+    <section id="yongshen" class="yongshen"></section>
 
-  <section id="yongshen" class="yongshen"></section>
+    <section id="yingqi" class="yingqi"></section>
 
-  <section id="yingqi" class="yingqi"></section>
+    <section id="patterns" class="patterns"></section>
+  </div>
 
-  <section id="patterns" class="patterns"></section>
+  <!-- 六爻结果 -->
+  <section id="liuyaoView" class="liuyao-view u-hidden"></section>
 
   <section class="interp">
     <div class="interp-head">
@@ -119,11 +155,15 @@
   </section>
 
   <footer class="app-footer">
-    排盘内核 <a href="https://github.com/3metaJun/3meta" target="_blank" rel="noopener">3meta</a>（MIT License）· 按北京时间起局 · 仅供自用参考，勿用于非法用途 · by wmy
+    排盘内核 <a href="https://github.com/3metaJun/3meta" target="_blank" rel="noopener">3meta</a> /
+    <a href="https://github.com/hhszzzz/taibu" target="_blank" rel="noopener">taibu-core</a>（均 MIT License）·
+    按北京时间起局 · 仅供自用参考，勿用于非法用途 · by wmy
   </footer>
 
   <script src="vendor/3meta.min.js"></script>
   <script src="rules.js"></script>
+  <script src="vendor/liuyao.min.js"></script>
+  <script src="liuyao.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

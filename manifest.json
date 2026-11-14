@@ -1,7 +1,7 @@
 {
-  "name": "奇门遁甲排盘",
-  "short_name": "奇门排盘",
-  "description": "个人自用奇门遁甲问卦排盘：3meta 排盘内核 + 用神格局 + DeepSeek 解读",
+  "name": "六爻 · 奇门排盘",
+  "short_name": "六爻奇门",
+  "description": "个人自用六爻/奇门问卦排盘：taibu-core + 3meta 内核 + 用神格局应期 + DeepSeek 解读",
   "lang": "zh-CN",
   "start_url": "./",
   "scope": "./",
@@ -10,8 +10,23 @@
   "background_color": "#f6f1e8",
   "theme_color": "#f6f1e8",
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
   ]
 }

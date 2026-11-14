@@ -566,6 +566,12 @@
     if (btnQuick) btnQuick.addEventListener('click', quickCast);
     var btnManual = document.getElementById('btnManualCast');
     if (btnManual) btnManual.addEventListener('click', openManual);
+    var btnReset = document.getElementById('btnResetCast');
+    if (btnReset) btnReset.addEventListener('click', function () {
+      resetCast();
+      var q = document.getElementById('question');
+      if (q) q.focus();
+    });
     renderSlots(-1);
   }
 

@@ -471,3 +471,20 @@ input, textarea, select { font-size: 16px; }
   display: inline-block; font-size: 10px; padding: 0 4px; border-radius: 4px;
   background: #f3ece0; color: var(--gold); margin-right: 5px;
 }
+
+/* 设置面板：接口地址 / 模型输入 */
+#apiBase,
+.interp-settings input[type="text"] {
+  width: 100%; box-sizing: border-box; padding: 9px 10px; margin-top: 6px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--cell); color: var(--text); font-size: 16px;
+  -webkit-appearance: none; appearance: none;
+}
+#apiBase:focus,
+.interp-settings input[type="text"]:focus { outline: none; border-color: var(--gold); }
+#apiBaseCustom { margin-top: 6px; }
+.field-tip { font-size: 11px; color: var(--muted); margin-top: 5px; line-height: 1.5; }
+
+/* 重新问一卦 */
+.ask-again-row { max-width: 720px; margin: 4px auto 14px; padding: 0 12px; text-align: center; }
+.ask-again-row .btn-ghost { width: 100%; }

@@ -492,13 +492,25 @@
   // 问题类型 → 体系建议（规则化判断，即时给出，不调模型）
   var ADVISE_RULES = [
     { sys: 'liuyao', why: '问何时、问应期，六爻的应期体系最细（冲空填实、值日值月）',
-      kw: ['什么时候', '何时', '几时', '多久', '哪天', '多久能', '应期', '时间点', '还要等'] },
-    { sys: 'qimen', why: '涉及多个选项或去留取舍，奇门九宫格局更适合比优劣、看方位与形势',
-      kw: ['还是', '要不要', '该不该', '该去', '哪个', '哪一个', '哪边', '对比', '优劣', '取舍', '去留', '方向', '方位', '布局', '择日'] },
+      kw: ['什么时候', '何时', '几时', '多久', '哪天', '多久能', '应期', '时间点', '还要等', '几月', '几年', '多久会'] },
+    { sys: 'qimen', why: '要比较几个选项或判断去留方位，奇门九宫适合比优劣、看形势',
+      kw: ['还是', '要不要', '该不该', '该去', '哪个', '哪一个', '哪边', '哪里', '对比', '优劣', '取舍', '去留', '方向', '方位', '布局', '择日', '选哪', '比较好', '好一点'] },
     { sys: 'liuyao', why: '问单件事的成败有无，六爻一问一断最直接',
-      kw: ['会不会', '能不能', '成不成', '有没有', '是不是', '能否', '可否', '是否能', '顺利吗', '有希望'] },
-    { sys: 'qimen', why: '问整体态势与应对，奇门看大势、主客与格局更完整',
-      kw: ['局势', '形势', '大局', '趋势', '整体', '该怎么办', '如何应对', '怎么破局'] }
+      kw: ['会不会', '能不能', '成不成', '有没有', '是不是', '能否', '可否', '是否能', '顺利吗', '有希望', '能不能成', '会成功吗', '有戏吗', '能拿到吗', '能过吗', '能中吗'] },
+    { sys: 'qimen', why: '问整体局势与如何应对，奇门看大势、主客与格局更完整',
+      kw: ['局势', '形势', '大局', '趋势', '整体', '该怎么办', '如何应对', '怎么破局', '如何推进', '该怎么选'] },
+    // 具体事项关键词：多数属「一事一断」，给六爻；带方位/地点者给奇门
+    { sys: 'qimen', why: '涉及地点、搬迁或方位选择，奇门更适合看方向与形势',
+      kw: ['搬去', '搬到', '去哪个城市', '换城市', '在哪里', '哪个城市', '选城市', '选址', '摆在哪'] },
+    { sys: 'liuyao', why: '这类具体事项适合六爻考古凶应期',
+      kw: ['面试', '通知', 'offer', '入职', '跳槽', '升职', '涨薪', '加薪', '辞职', '裁员', '被裁', '领导', '老板',
+           '相亲', '复合', '分手', '表白', '恋爱', '对象', '结婚', '离婚', '前任', '暧昧',
+           '借钱', '回款', '欠款', '投资', '股票', '基金', '买房', '卖房', '贷款', '收入', '奖金', '分红',
+           '生病', '手术', '体检', '医院', '失眠', '怀孕',
+           '考试', '分数', '录取', '上岸', '论文', '答辩', '复试',
+           '签证', '机票', '出差', '旅行', '移民',
+           '诉讼', '官司', '报警', '纠纷', '律师',
+           '丢了', '找不到', '遗失', '走失', '找不到东西'] }
   ];
 
   function updateSysAdvice(text) {
@@ -514,7 +526,10 @@
         if (t.indexOf(ADVISE_RULES[r].kw[k]) >= 0) { pick = ADVISE_RULES[r]; break; }
       }
     }
-    if (!pick) { hint.classList.add('u-hidden'); hint.innerHTML = ''; return; }
+    if (!pick) {
+      // 兜底：识别不出类型时也给建议，避免「没有推荐」
+      pick = { sys: 'liuyao', why: '常规问事，六爻一问一断最稳；若要比较选项或看整体态势，可切到奇门' };
+    }
     var name = pick.sys === 'liuyao' ? '六爻' : '奇门';
     hint.innerHTML = '这类问题更适合 <b>' + name + '</b>：' + pick.why +
       '。<button type="button" class="link-btn" data-goto="' + pick.sys + '">切到' + name + '</button>';
@@ -570,8 +585,31 @@
     addHistoryEntry(entry);
     renderHistoryList();
 
+    showAskAgain(true);
     var view = document.getElementById('liuyaoView');
     if (view) view.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function showAskAgain(show) {
+    var row = document.getElementById('askAgainRow');
+    if (row) row.classList.toggle('u-hidden', !show);
+  }
+
+  function askAgain() {
+    var out = document.getElementById('interpOut');
+    if (out) out.innerHTML = '';
+    if (currentSystem === 'liuyao' && window.QimenLiuyao) {
+      window.QimenLiuyao.reset();
+      currentLiuyao = null;
+      currentYaoValues = [];
+    }
+    showAskAgain(false);
+    var q = document.getElementById('question');
+    var form = document.querySelector('.qiu-form');
+    if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (q) {
+      setTimeout(function () { try { q.focus({ preventScroll: true }); } catch (e) {} }, 260);
+    }
   }
 
   function renderQiuSummary() {
@@ -620,6 +658,7 @@
     addHistoryEntry(entry);
     renderHistoryList();
 
+    showAskAgain(true);
     var panel = document.querySelector('.info-panel');
     if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -755,6 +794,7 @@
     restoreInterp(e);
 
     document.getElementById('historyPanel').classList.add('u-hidden');
+    showAskAgain(true);
     var panel = document.querySelector('.info-panel');
     if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -856,18 +896,41 @@
     '4. 排盘数据不足以支撑某个判断时，直接说「依据不足」，不要臆测；神煞只作辅助参断（贵人/文昌/禄神等吉神可增其力，羊刃/桃花等须结合用神与格局看），不可单凭神煞定吉凶；\n' +
     '5. 结尾附一句「本解读仅供娱乐参考，人生决策请结合现实理性判断」。';
 
+  var DEFAULT_BASE = 'https://api.ohmygpt.com/v1';
+  var DEFAULT_MODEL = 'deepseek/deepseek-v4.1-flash-1017';
+
   function loadSettings() {
-    var s = { apiKey: '', model: 'deepseek-v4-pro', thinking: 'enabled' };
+    var s = { apiKey: '', baseUrl: DEFAULT_BASE, model: DEFAULT_MODEL, effort: 'max' };
     try {
       var raw = localStorage.getItem(SETTINGS_KEY);
       if (raw) {
         var j = JSON.parse(raw);
         if (j.apiKey) s.apiKey = j.apiKey;
-        if (j.model) s.model = j.model;
-        if (j.thinking) s.thinking = j.thinking;
+        if (j.baseUrl) {
+          s.baseUrl = j.baseUrl;
+          if (j.model) s.model = j.model;
+          if (j.effort) s.effort = j.effort;
+        } else if (j.model && j.model.indexOf('deepseek/') >= 0) {
+          // 旧版存过第三方模型名 → 视为第三方源
+          s.model = j.model;
+          if (j.thinking) s.effort = (j.thinking === 'disabled') ? 'off' : 'high';
+        } else if (j.model) {
+          // 旧版官方源配置 → 迁移到新的第三方默认源
+          s.baseUrl = DEFAULT_BASE; s.model = DEFAULT_MODEL; s.effort = 'max';
+        }
       }
     } catch (e) {}
     return s;
+  }
+
+  function normalizeBase(u) {
+    var b = String(u || '').trim().replace(/\/+$/, '');
+    return b || DEFAULT_BASE;
+  }
+
+  function apiEndpoint(baseUrl) {
+    var b = normalizeBase(baseUrl);
+    return b + '/chat/completions';
   }
 
   function saveSettings(s) {
@@ -878,10 +941,42 @@
   function applySettingsToUI(s) {
     var ak = document.getElementById('apiKey');
     if (ak) ak.value = s.apiKey || '';
-    var modelRadios = document.querySelectorAll('input[name="model"]');
-    for (var i = 0; i < modelRadios.length; i++) modelRadios[i].checked = (modelRadios[i].value === s.model);
-    var thinkRadios = document.querySelectorAll('input[name="thinking"]');
-    for (var j = 0; j < thinkRadios.length; j++) thinkRadios[j].checked = (thinkRadios[j].value === s.thinking);
+    var mi = document.getElementById('modelInput');
+    if (mi) mi.value = s.model || DEFAULT_MODEL;
+    var sel = document.getElementById('apiBase');
+    var cust = document.getElementById('apiBaseCustom');
+    if (sel) {
+      var base = normalizeBase(s.baseUrl);
+      var hit = false;
+      for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === base) { sel.value = base; hit = true; break; }
+      }
+      if (!hit) {
+        sel.value = '__custom';
+        if (cust) { cust.value = base; cust.classList.remove('u-hidden'); }
+      } else if (cust) {
+        cust.classList.add('u-hidden');
+      }
+    }
+    var eff = document.querySelectorAll('input[name="effort"]');
+    for (var j = 0; j < eff.length; j++) eff[j].checked = (eff[j].value === (s.effort || 'max'));
+  }
+
+  function readSettingsFromUI() {
+    var cur = loadSettings();
+    var ok = document.getElementById('apiKey');
+    if (ok) cur.apiKey = ok.value.trim();
+    var mi = document.getElementById('modelInput');
+    if (mi && mi.value.trim()) cur.model = mi.value.trim();
+    var sel = document.getElementById('apiBase');
+    var cust = document.getElementById('apiBaseCustom');
+    if (sel) {
+      if (sel.value === '__custom') cur.baseUrl = normalizeBase(cust ? cust.value : '');
+      else cur.baseUrl = sel.value;
+    }
+    var eff = document.querySelector('input[name="effort"]:checked');
+    if (eff) cur.effort = eff.value;
+    return cur;
   }
 
   function refreshKeyStatus(flash) {
@@ -938,8 +1033,10 @@
       if (!s || typeof s !== 'object' || !s.apiKey) throw new Error('bad');
       var cur = loadSettings();
       cur.apiKey = String(s.apiKey);
-      cur.model = (s.model === 'deepseek-flash') ? 'deepseek-flash' : 'deepseek-v4-pro';
-      cur.thinking = (s.thinking === 'disabled') ? 'disabled' : 'enabled';
+      if (s.baseUrl) cur.baseUrl = normalizeBase(s.baseUrl);
+      if (s.model) cur.model = String(s.model);
+      if (s.effort) cur.effort = String(s.effort);
+      else if (s.thinking) cur.effort = (s.thinking === 'disabled') ? 'off' : 'high';
       if (!saveSettings(cur)) throw new Error('storage');
       applySettingsToUI(cur);
       if (el) { el.textContent = '✅ 已导入并保存'; el.className = 'key-status ok'; }
@@ -1064,18 +1161,22 @@
     return html;
   }
 
-  function callDeepSeek(apiKey, model, thinking, messages, onReason, onContent, onError, onDone) {
-    var body = { model: model, messages: messages, stream: true };
-    body.thinking = { type: thinking === 'enabled' ? 'enabled' : 'disabled' };
-    if (thinking === 'enabled') body.reasoning_effort = 'high';
+  function callDeepSeek(settings, messages, onReason, onContent, onError, onDone) {
+    var s = settings || loadSettings();
+    var body = { model: s.model || DEFAULT_MODEL, messages: messages, stream: true };
+    if (s.effort && s.effort !== 'off') {
+      body.reasoning_effort = s.effort;
+    } else if (normalizeBase(s.baseUrl).indexOf('api.deepseek.com') >= 0) {
+      body.thinking = { type: 'disabled' };
+    }
 
     var ctrl = new AbortController();
     var timedOut = false;
     var timer = setTimeout(function () { timedOut = true; ctrl.abort(); }, 180000); // 总超时 3 分钟
 
-    fetch('https://api.deepseek.com/chat/completions', {
+    fetch(apiEndpoint(s.baseUrl), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (s.apiKey || '') },
       body: JSON.stringify(body),
       signal: ctrl.signal
     }).then(function (resp) {
@@ -1135,7 +1236,7 @@
       document.getElementById('interpSettings').classList.remove('u-hidden');
       var ak = document.getElementById('apiKey');
       if (ak) ak.focus();
-      out.innerHTML = '<div class="interp-msg">请先在上方「设置」里填入 DeepSeek API Key（仅存本机）</div>';
+      out.innerHTML = '<div class="interp-msg">请先在上方「设置」里填入 API Key（要与你选的接口地址对应，仅存本机）</div>';
       return;
     }
     var isLY = currentSystem === 'liuyao';
@@ -1173,7 +1274,7 @@
       if (elapsedEl) elapsedEl.textContent = '';
     }
 
-    callDeepSeek(s.apiKey, s.model, s.thinking,
+    callDeepSeek(s,
       [{ role: 'system', content: sysPrompt }, { role: 'user', content: prompt }],
       function (rt) {
         markStarted();
@@ -1211,37 +1312,47 @@
 
   function initSettings() {
     var s = loadSettings();
+    applySettingsToUI(s);
+
+    function persist(flash) {
+      var cur = readSettingsFromUI();
+      var ok = saveSettings(cur);
+      if (!ok) {
+        var el = document.getElementById('keyStatus');
+        if (el) { el.textContent = '⚠️ 保存失败（浏览器禁止本地存储，请勿用无痕模式）'; el.className = 'key-status err'; }
+        return;
+      }
+      refreshKeyStatus(flash);
+    }
+
     var ak = document.getElementById('apiKey');
     if (ak) {
-      ak.value = s.apiKey;
-      ak.addEventListener('input', function () { saveKeyFromInput(false); });
-      ak.addEventListener('change', function () { saveKeyFromInput(true); });
+      ak.addEventListener('input', function () { persist(false); });
+      ak.addEventListener('change', function () { persist(true); });
     }
+    var mi = document.getElementById('modelInput');
+    if (mi) mi.addEventListener('change', function () { persist(false); });
+
+    var sel = document.getElementById('apiBase');
+    var cust = document.getElementById('apiBaseCustom');
+    if (sel) sel.addEventListener('change', function () {
+      if (sel.value === '__custom') { if (cust) cust.classList.remove('u-hidden'); }
+      else if (cust) cust.classList.add('u-hidden');
+      persist(false);
+    });
+    if (cust) {
+      cust.addEventListener('change', function () { persist(false); });
+      cust.addEventListener('input', function () { persist(false); });
+    }
+    var eff = document.querySelectorAll('input[name="effort"]');
+    for (var k = 0; k < eff.length; k++) eff[k].addEventListener('change', function () { persist(false); });
+
     var btnSaveKey = document.getElementById('btnSaveKey');
-    if (btnSaveKey) btnSaveKey.addEventListener('click', function () { saveKeyFromInput(true); });
+    if (btnSaveKey) btnSaveKey.addEventListener('click', function () { persist(true); });
     var btnExportKey = document.getElementById('btnExportKey');
     if (btnExportKey) btnExportKey.addEventListener('click', exportKeyBackup);
     var btnImportKey = document.getElementById('btnImportKey');
     if (btnImportKey) btnImportKey.addEventListener('click', importKeyBackup);
-    var modelRadios = document.querySelectorAll('input[name="model"]');
-    for (var i = 0; i < modelRadios.length; i++) {
-      modelRadios[i].checked = (modelRadios[i].value === s.model);
-    }
-    var thinkRadios = document.querySelectorAll('input[name="thinking"]');
-    for (var j = 0; j < thinkRadios.length; j++) {
-      thinkRadios[j].checked = (thinkRadios[j].value === s.thinking);
-    }
-    var all = document.querySelectorAll('input[name="model"], input[name="thinking"]');
-    for (var k = 0; k < all.length; k++) {
-      all[k].addEventListener('change', function () {
-        var cur = loadSettings();
-        var m = document.querySelector('input[name="model"]:checked');
-        var th = document.querySelector('input[name="thinking"]:checked');
-        if (m) cur.model = m.value;
-        if (th) cur.thinking = th.value;
-        saveSettings(cur);
-      });
-    }
     var btnS = document.getElementById('btnSettings');
     if (btnS) btnS.addEventListener('click', function () {
       document.getElementById('interpSettings').classList.toggle('u-hidden');
@@ -1282,6 +1393,8 @@
 
     renderAskChips();
     initSystemTabs();
+    var btnAgain = document.getElementById('btnAskAgain');
+    if (btnAgain) btnAgain.addEventListener('click', askAgain);
     initSettings();
     initHistory();
     initAutoGrow();

@@ -80,6 +80,7 @@
         <button id="btnShake" class="btn-cast" type="button">摇 第 1 爻</button>
         <button id="btnQuickCast" class="btn-ghost" type="button">一键摇完</button>
         <button id="btnManualCast" class="btn-ghost" type="button">手动录入</button>
+        <button id="btnResetCast" class="btn-ghost u-hidden" type="button">重摇此卦</button>
       </div>
       <div id="manualBox" class="manual-box u-hidden"></div>
     </div>
@@ -114,6 +115,10 @@
   <!-- 六爻结果 -->
   <section id="liuyaoView" class="liuyao-view u-hidden"></section>
 
+  <div class="ask-again-row u-hidden" id="askAgainRow">
+    <button id="btnAskAgain" class="btn-ghost" type="button">↺ 重新问一卦</button>
+  </div>
+
   <section class="interp">
     <div class="interp-head">
       <button id="btnInterp" class="btn-interp" type="button">🔮 AI 解读</button>
@@ -135,20 +140,29 @@
         <textarea id="keyBackup" class="key-backup u-hidden" rows="3" placeholder="点「导出备份」生成；粘贴备份内容后点「导入备份」"></textarea>
       </div>
       <div class="qiu-block">
-        <div class="qiu-label">模型</div>
-        <div class="qiu-radio">
-          <label><input type="radio" name="model" value="deepseek-v4-pro" checked> v4-pro（更强）</label>
-          <label><input type="radio" name="model" value="deepseek-flash"> flash（更省）</label>
-        </div>
+        <div class="qiu-label">接口地址</div>
+        <select id="apiBase">
+          <option value="https://api.ohmygpt.com/v1">第三方中转（ohmygpt）</option>
+          <option value="https://api.deepseek.com">DeepSeek 官方</option>
+          <option value="__custom">自定义…</option>
+        </select>
+        <input type="text" id="apiBaseCustom" class="u-hidden" placeholder="https://你的中转地址/v1" autocomplete="off">
       </div>
       <div class="qiu-block">
-        <div class="qiu-label">思考模式</div>
+        <div class="qiu-label">模型</div>
+        <input type="text" id="modelInput" placeholder="deepseek/deepseek-v4.1-flash-1017" autocomplete="off">
+        <div class="field-tip">中转站：deepseek/deepseek-v4.1-flash-1017 · 官方：deepseek-v4-pro / deepseek-flash</div>
+      </div>
+      <div class="qiu-block">
+        <div class="qiu-label">思考强度</div>
         <div class="qiu-radio">
-          <label><input type="radio" name="thinking" value="enabled" checked> 开启深度思考（high）</label>
-          <label><input type="radio" name="thinking" value="disabled"> 关闭（更快）</label>
+          <label><input type="radio" name="effort" value="max" checked> 最高 max</label>
+          <label><input type="radio" name="effort" value="high"> 高</label>
+          <label><input type="radio" name="effort" value="low"> 低</label>
+          <label><input type="radio" name="effort" value="off"> 关闭（最快）</label>
         </div>
       </div>
-      <p class="interp-tip">Key 由浏览器直连 DeepSeek 官方接口，不经过任何第三方服务器；费用从你的 DeepSeek 余额扣除。</p>
+      <p class="interp-tip">Key 仅存本机 localStorage，由浏览器直连所填接口，不经过本站服务器。</p>
     </div>
 
     <div id="interpOut" class="interp-out"></div>

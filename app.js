@@ -743,7 +743,7 @@
     var out = document.getElementById('interpOut');
     if (!out) return;
     out.innerHTML = e.interp
-      ? '<details class="reason-box" open><summary>深度思考过程</summary><div class="reason-body">' + esc(e.interp.reasoning || '') + '</div></details>' +
+      ? '<details class="reason-box"><summary>深度思考原文（模型内部推理，可能中英混杂，仅供参考）</summary><div class="reason-body">' + esc(cleanCoT(e.interp.reasoning || '')) + '</div></details>' +
         '<div class="answer-box">' + mdToHtml(e.interp.answer || '') + '</div>'
       : '';
   }
@@ -894,7 +894,8 @@
     '2. 术语可保留，但需用白话解释；\n' +
     '3. 客观中立、不绝对化、不制造焦虑；\n' +
     '4. 排盘数据不足以支撑某个判断时，直接说「依据不足」，不要臆测；神煞只作辅助参断（贵人/文昌/禄神等吉神可增其力，羊刃/桃花等须结合用神与格局看），不可单凭神煞定吉凶；\n' +
-    '5. 结尾附一句「本解读仅供娱乐参考，人生决策请结合现实理性判断」。';
+    '5. 结尾附一句「本解读仅供娱乐参考，人生决策请结合现实理性判断」。' +
+    '\n另外：思考过程（reasoning）请尽量使用中文书写，便于阅读。';
 
   var DEFAULT_BASE = 'https://api.ohmygpt.com/v1';
   var DEFAULT_MODEL = 'deepseek/deepseek-v4.1-flash-1017';
@@ -1161,6 +1162,13 @@
     return html;
   }
 
+  // 思考原文只做展示：清掉裸控制字符与替换符，避免出现视觉上的乱码
+  function cleanCoT(t) {
+    return String(t || '')
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+      .replace(/\uFFFD/g, '');
+  }
+
   function callDeepSeek(settings, messages, onReason, onContent, onError, onDone) {
     var s = settings || loadSettings();
     var body = { model: s.model || DEFAULT_MODEL, messages: messages, stream: true };
@@ -1252,7 +1260,7 @@
     var sysPrompt = isLY && window.QimenLiuyao ? window.QimenLiuyao.SYSTEM_PROMPT : SYSTEM_PROMPT;
     if (btnI) { btnI.disabled = true; btnI.textContent = '🔮 解读中…'; }
     out.innerHTML =
-      '<details class="reason-box" open><summary>深度思考过程</summary><div class="reason-body" id="reasonBody"></div></details>' +
+      '<details class="reason-box"><summary>深度思考原文（模型内部推理，可能中英混杂，仅供参考）</summary><div class="reason-body" id="reasonBody"></div></details>' +
       '<div class="answer-box" id="answerBox"><span class="typing" id="typing">AI 深度思考中，通常需 30 秒~2 分钟，请耐心等待…</span>' +
       '<span class="interp-elapsed" id="elapsed"></span></div>';
     var reasonBody = document.getElementById('reasonBody');
@@ -1274,17 +1282,29 @@
       if (elapsedEl) elapsedEl.textContent = '';
     }
 
+    // 思考原文可能上万字，逐字重绘会卡顿，改为每 150ms 批量刷新
+    var rafTimer = null;
+    function flushReason() {
+      rafTimer = null;
+      if (reasonBody) reasonBody.textContent = cleanCoT(reasonBuf);
+      if (answerBuf && answerBox) answerBox.innerHTML = mdToHtml(answerBuf);
+    }
+    function scheduleFlush() {
+      if (rafTimer) return;
+      rafTimer = setTimeout(flushReason, 150);
+    }
+
     callDeepSeek(s,
       [{ role: 'system', content: sysPrompt }, { role: 'user', content: prompt }],
       function (rt) {
         markStarted();
         reasonBuf += rt;
-        reasonBody.textContent = reasonBuf;
+        scheduleFlush();
       },
       function (ct) {
         markStarted();
         answerBuf += ct;
-        answerBox.innerHTML = mdToHtml(answerBuf);
+        scheduleFlush();
       },
       function (err) {
         clearInterval(elapsedTimer);
@@ -1302,6 +1322,8 @@
       },
       function () {
         clearInterval(elapsedTimer);
+        if (rafTimer) { clearTimeout(rafTimer); rafTimer = null; }
+        flushReason();
         if (currentHistoryId && (reasonBuf || answerBuf)) {
           updateHistoryEntry(currentHistoryId, { interp: { reasoning: reasonBuf, answer: answerBuf } });
           renderHistoryList();

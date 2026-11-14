@@ -3,6 +3,7 @@
   'use strict';
 
   var ThreeMeta = window.ThreeMeta;
+  var QRules = window.QimenRules;
   var app = document.getElementById('grid');
   if (!ThreeMeta || !app) {
     document.body.insertAdjacentHTML('beforeend',
@@ -38,6 +39,9 @@
   var currentQuestion = '';
   var currentContext = '';
   var currentHistoryId = null; // 当前问卦在历史记录里的 id（未保存为 null）
+  var currentShenSha = [];     // 本次盘的神煞列表
+  var currentSSByPalace = {};  // 神煞按宫分组
+  var currentYingqi = null;    // 本次盘的应期推算
 
   var YONGSHEN_MAP = {
     '综合': [
@@ -177,10 +181,32 @@
   }
 
   function render(chart) {
+    if (QRules) {
+      currentShenSha = QRules.detectShenSha(chart);
+      currentSSByPalace = QRules.groupByPalace(currentShenSha);
+    } else {
+      currentShenSha = [];
+      currentSSByPalace = {};
+    }
     renderHeader(chart);
     renderGrid(chart);
     renderYongShen(chart);
+    renderYingqi(chart);
     renderPatterns(chart);
+  }
+
+  // 某宫的神煞标签
+  function ssTagsHtml(pos) {
+    var list = currentSSByPalace[pos] || [];
+    if (!list.length) return '';
+    return '<div class="ss-tags">' + list.map(function (s) {
+      var cls = s.auspice === '凶' ? ' ss-bad' : (s.auspice === '吉' ? ' ss-good' : '');
+      return '<span class="ss-tag' + cls + '">' + s.name + '</span>';
+    }).join('') + '</div>';
+  }
+
+  function ssNamesOf(pos) {
+    return (currentSSByPalace[pos] || []).map(function (s) { return s.name; });
   }
 
   function renderHeader(chart) {
@@ -261,7 +287,8 @@
       '<span class="earth">' + fmt(p.earthlyStem) + '</span></div>' +
       '<div class="hidden">暗 ' + fmt(hidden) + '</div>' +
       '<div class="branch">' + fmt(p.earthBranch) + '</div>' +
-      markHtml;
+      markHtml +
+      ssTagsHtml(p.position);
 
     return cell;
   }
@@ -333,10 +360,15 @@
     var respHtml = resp
       ? '<div class="ys-resp">干应：' + resp.description + '（' + resp.relation + '）</div>' : '';
 
+    var ssNames = ssNamesOf(p.position);
+    var ssHtml = ssNames.length
+      ? '<div class="ys-ss">神煞：' + ssNames.join('、') + '</div>' : '';
+
     return '<div class="ys-card">' +
       '<div class="ys-title">' + title + ' <span class="ys-loc">→ ' + info.name + '·' + info.dir + '</span></div>' +
       '<div class="ys-wang">星 ' + (status.star || '-') + ' · 门 ' + (status.gate || '-') + '</div>' +
       badgeHtml +
+      ssHtml +
       (patHtml.length ? '<div class="ys-pats">' + patHtml.join(' ') + '</div>' : '') +
       respHtml +
       '</div>';
@@ -355,6 +387,50 @@
     box.innerHTML = html;
   }
 
+  // —— 应期推算卡片 ——
+  function renderYingqi(chart) {
+    var box = document.getElementById('yingqi');
+    if (!box) return;
+    currentYingqi = null;
+    if (!QRules) { box.innerHTML = ''; return; }
+    var items = YONGSHEN_MAP[currentCategory] || [];
+    if (!items.length) { box.innerHTML = ''; return; }
+
+    // 应期以「主用神」为断：综合类取日干（求测人），其余取该类的第一位用神
+    var primary = items[0];
+    if (currentCategory === '综合') {
+      for (var k = 0; k < items.length; k++) {
+        if (items[k].kind === 'dayStem') { primary = items[k]; break; }
+      }
+    }
+    var loc = locateYongShen(chart, primary);
+    if (!loc.palace) { box.innerHTML = ''; return; }
+
+    var yq = QRules.computeYingqi(chart, loc.palace.position);
+    if (!yq) { box.innerHTML = ''; return; }
+    currentYingqi = yq;
+    yq.yongShenLabel = primary.label;
+
+    var branchPal = QRules.BRANCH_PALACE[yq.branch] || 0;
+    var branchPalName = branchPal ? (PALACE_NAME[branchPal].name + '·' + PALACE_NAME[branchPal].dir) : '';
+
+    box.innerHTML =
+      '<div class="yq-card">' +
+        '<div class="yq-head">应期推算<span class="yq-sub">以用神「' + primary.label + '」落' +
+          (PALACE_NAME[yq.yongShenPalace] ? PALACE_NAME[yq.yongShenPalace].name : yq.yongShenPalace + '宫') +
+          '为断</span></div>' +
+        '<div class="yq-line"><b>远近</b>' + yq.scale + ' · ' + yq.unit + '</div>' +
+        '<div class="yq-why">' + yq.scaleWhy + '</div>' +
+        (yq.branch
+          ? '<div class="yq-line"><b>应期支</b><span class="yq-branch">' + yq.branch + '</span>' +
+            (branchPalName ? '<span class="yq-pal">' + branchPalName + '</span>' : '') + '</div>' +
+            '<div class="yq-why">' + yq.basis + '</div>'
+          : '') +
+        (yq.zhishi.text ? '<div class="yq-line"><b>事期</b>' + yq.zhishi.text + '</div>' : '') +
+        '<div class="yq-note">应期只作时间线索（主近期/远期与可能应验之支），不断吉凶，也不宜脱离事体大小硬套。</div>' +
+      '</div>';
+  }
+
   function renderAskChips() {
     var box = document.getElementById('askChips');
     if (!box) return;
@@ -370,7 +446,7 @@
           var kids = box.children;
           for (var j = 0; j < kids.length; j++) kids[j].className = 'chip';
           el.className = 'chip active';
-          if (currentChart) renderYongShen(currentChart);
+          if (currentChart) { renderYongShen(currentChart); renderYingqi(currentChart); }
           if (currentHistoryId) updateHistoryEntry(currentHistoryId, { category: cat });
         });
       })(ASK_CATEGORIES[i], chip);
@@ -621,13 +697,14 @@
     '2. 生克：看日干（求测人自己）与用神、时干（所问之事）之间的五行生克；时干克日干为「五不遇时」主不吉；\n' +
     '3. 吉凶：看用神宫是否带凶象（门迫/击刑/入墓/空亡/凶格）或吉象（吉格/得令旺相）；\n' +
     '4. 大势：看值符（整体环境/贵人）与值使（事体主导）落宫及其旺衰；\n' +
-    '5. 应期：结合值使落宫、驿马、空亡（填实应期）等判断应验时间；数据不足以推断时明确写「应期不明」；\n' +
+    '5. 应期：优先采用【应期推算】给出的远近尺度（近快按日/时、远慢按月/年）、应期支与事期宫数，' +
+      '结合驿马、空亡、入墓等因素说明理由；若【应期推算】标为「难定」或依据不足，直接写「应期不明」，不可自造日期；\n' +
     '6. 建议：依据以上吉凶给出趋吉避凶的具体建议，紧扣排盘数据，不空谈、不夸大。\n' +
     '输出要求：\n' +
     '1. 分点输出：当前局势、发展趋势、吉凶关键点、具体建议、应期（若可判断）；\n' +
     '2. 术语可保留，但需用白话解释；\n' +
     '3. 客观中立、不绝对化、不制造焦虑；\n' +
-    '4. 排盘数据不足以支撑某个判断时，直接说「依据不足」，不要臆测；\n' +
+    '4. 排盘数据不足以支撑某个判断时，直接说「依据不足」，不要臆测；神煞只作辅助参断（贵人/文昌/禄神等吉神可增其力，羊刃/桃花等须结合用神与格局看），不可单凭神煞定吉凶；\n' +
     '5. 结尾附一句「本解读仅供娱乐参考，人生决策请结合现实理性判断」。';
 
   function loadSettings() {
@@ -727,9 +804,11 @@
     var info = PALACE_NAME[p.position];
     var marks = ysBadges(chart, p);
     var status = p.status || {};
+    var ss = ssNamesOf(p.position);
     return info.name + '：' + fmt(p.star) + '/' + fmt(p.gate) + '/' + fmt(p.deity) +
       ' 天盘' + fmt(p.heavenlyStem) + ' 地盘' + fmt(p.earthlyStem) +
       ' 星' + (status.star || '-') + '门' + (status.gate || '-') +
+      (ss.length ? ' 神煞[' + ss.join(',') + ']' : '') +
       (marks.length ? ' [' + marks.join(',') + ']' : '');
   }
 
@@ -781,6 +860,33 @@
       L.push(ysPromptLine(chart, items[i], locateYongShen(chart, items[i])));
     }
     L.push('');
+
+    if (currentYingqi) {
+      var yq = currentYingqi;
+      L.push('【应期推算】');
+      L.push('用神：' + (yq.yongShenLabel || '') + '（落' + yq.yongShenPalace + '宫）');
+      L.push('远近：' + yq.scale + '（' + yq.unit + '）—— ' + yq.scaleWhy);
+      if (yq.branch) {
+        L.push('应期支：' + yq.branch + '（' +
+          ((PALACE_NAME[QRules.BRANCH_PALACE[yq.branch]]) ? PALACE_NAME[QRules.BRANCH_PALACE[yq.branch]].name : '') +
+          '）—— ' + yq.basis);
+      } else {
+        L.push('应期支：难定');
+      }
+      if (yq.zhishi && yq.zhishi.text) L.push('事期：' + yq.zhishi.text);
+      L.push('口径：应期只作时间线索，不断吉凶；事体大小与常理须一并参考。');
+      L.push('');
+    }
+
+    if (currentShenSha.length) {
+      L.push('【神煞】');
+      currentShenSha.forEach(function (s) {
+        var pn = PALACE_NAME[s.palace] ? PALACE_NAME[s.palace].name : s.palace + '宫';
+        L.push(s.name + '（' + s.auspice + '）落' + pn + '，以' + s.anchor + '起；' + (s.desc || ''));
+      });
+      L.push('');
+    }
+
     L.push('【九宫概况】');
     for (var j = 0; j < PALACE_ORDER.length; j++) {
       var brief = palaceBrief(chart, palaceByPos(chart, PALACE_ORDER[j]));

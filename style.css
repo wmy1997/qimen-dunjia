@@ -270,3 +270,85 @@ input, textarea, select { font-size: 16px; }
   border: 1px solid var(--border); border-radius: 8px;
   background: #fffdf7; color: var(--text); resize: vertical; min-height: 64px;
 }
+
+/* —— 神煞标签（九宫格内） —— */
+.ss-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 3px;
+  margin-top: 2px;
+  justify-content: center;
+}
+.ss-tag {
+  font-size: 9px;
+  line-height: 1.3;
+  padding: 0 3px;
+  border-radius: 3px;
+  color: #6f5f8f;
+  background: rgba(111, 95, 143, .1);
+  white-space: nowrap;
+}
+.ss-tag.ss-good { color: #4f8a5e; background: rgba(79, 138, 94, .12); }
+.ss-tag.ss-bad  { color: #b85252; background: rgba(184, 82, 82, .12); }
+
+/* —— 用神卡神煞行 —— */
+.ys-ss {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* —— 应期推算卡 —— */
+.yingqi:empty { display: none; }
+.yq-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--cell);
+  padding: 10px 12px;
+  margin-top: 10px;
+}
+.yq-head {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gold);
+  margin-bottom: 6px;
+}
+.yq-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 6px;
+}
+.yq-line {
+  font-size: 13px;
+  color: var(--text);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+.yq-line b {
+  font-weight: 600;
+  color: var(--muted);
+  margin-right: 6px;
+}
+.yq-branch {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--red);
+  margin-right: 4px;
+}
+.yq-pal { font-size: 11px; color: var(--muted); }
+.yq-why {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-top: 2px;
+  padding-left: 2px;
+}
+.yq-note {
+  font-size: 10px;
+  color: var(--muted);
+  opacity: .85;
+  margin-top: 8px;
+  border-top: 1px dashed var(--border);
+  padding-top: 6px;
+}

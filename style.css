@@ -503,3 +503,25 @@ input, textarea, select { font-size: 16px; }
 .ym-head { font-size: 13px; color: var(--gold); font-weight: 600; margin-bottom: 4px; }
 .ym-line { font-size: 12px; color: var(--text); line-height: 1.7; }
 .ym-line.dim { color: var(--muted); }
+
+/* —— 复盘标记 —— */
+.hist-row { display: flex; flex-direction: column; gap: 5px; }
+.hist-review { display: flex; gap: 6px; padding-left: 2px; }
+.rv-btn {
+  font-family: inherit; font-size: 11px; line-height: 1; padding: 5px 9px;
+  border-radius: 7px; border: 1px solid var(--border); background: var(--panel);
+  color: var(--muted); cursor: pointer;
+}
+.rv-btn:active { transform: scale(.97); }
+.rv-btn.on.rv-yes { background: rgba(79,138,94,.14); border-color: rgba(79,138,94,.5); color: var(--green); }
+.rv-btn.on.rv-partial { background: rgba(169,126,58,.14); border-color: rgba(169,126,58,.5); color: var(--gold); }
+.rv-btn.on.rv-no { background: rgba(184,82,82,.12); border-color: rgba(184,82,82,.45); color: var(--red); }
+.rv-note-btn {
+  font-family: inherit; font-size: 11px; line-height: 1; padding: 5px 8px;
+  border-radius: 7px; border: 1px dashed var(--border); background: transparent;
+  color: var(--muted); cursor: pointer;
+}
+.hist-rv-note { font-size: 11px; color: var(--muted); padding-left: 3px; font-style: italic; }
+.hist-tag.rv-yes { color: var(--green); background: rgba(79,138,94,.12); }
+.hist-tag.rv-part { color: var(--gold); background: rgba(169,126,58,.13); }
+.hist-tag.rv-no { color: var(--red); background: rgba(184,82,82,.1); }

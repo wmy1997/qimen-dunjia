@@ -818,11 +818,25 @@
     var sub = isLY
       ? ((e.hexagram || '') + (e.changed ? ' → ' + e.changed : ''))
       : (e.ju || '');
-    return '<button class="hist-item" type="button" data-id="' + e.id + '">' +
-      '<div class="hist-title">' + esc(title) + (e.interp ? '<span class="hist-tag">已解读</span>' : '') + '</div>' +
+    var rv = e.review || '';
+    var rvTag = rv === 'yes' ? '<span class="hist-tag rv-yes">应验</span>'
+      : rv === 'partial' ? '<span class="hist-tag rv-part">部分应验</span>'
+      : rv === 'no' ? '<span class="hist-tag rv-no">未应验</span>' : '';
+    var rvBtns = ['yes:应验', 'partial:部分', 'no:未应验'].map(function (pair) {
+      var v = pair.split(':')[0], t = pair.split(':')[1];
+      return '<button class="rv-btn' + (rv === v ? ' on rv-' + v : '') + '" type="button" data-rv="' + v + '" data-id="' + e.id + '">' + t + '</button>';
+    }).join('');
+    return '<div class="hist-row">' +
+      '<button class="hist-item" type="button" data-id="' + e.id + '">' +
+      '<div class="hist-title">' + esc(title) + (e.interp ? '<span class="hist-tag">已解读</span>' : '') + rvTag + '</div>' +
       '<div class="hist-meta"><span class="hist-sys">' + (isLY ? '六爻' : '奇门') + '</span>' +
         time + ' · ' + esc(sub) + '</div>' +
-      '</button>';
+      '</button>' +
+      '<div class="hist-review">' + rvBtns +
+        '<button class="rv-note-btn" type="button" data-note-for="' + e.id + '" title="备注">✎</button>' +
+      '</div>' +
+      (e.reviewNote ? '<div class="hist-rv-note">' + esc(e.reviewNote) + '</div>' : '') +
+      '</div>';
   }
 
   function renderHistoryList() {
@@ -911,6 +925,23 @@
     if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  function setHistoryReview(id, status) {
+    var arr = loadHistory();
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i].id !== id) continue;
+      arr[i].review = (arr[i].review === status) ? '' : status;
+      arr[i].reviewedAt = arr[i].review ? Date.now() : null;
+      saveHistory(arr);
+      renderHistoryList();
+      return;
+    }
+  }
+
+  function setHistoryNote(id, note) {
+    updateHistoryEntry(id, { reviewNote: String(note || '').slice(0, 60) });
+    renderHistoryList();
+  }
+
   function initHistory() {
     var btn = document.getElementById('btnHistory');
     if (btn) btn.addEventListener('click', function () {
@@ -921,6 +952,18 @@
     });
     var list = document.getElementById('historyList');
     if (list) list.addEventListener('click', function (ev) {
+      var rvBtn = ev.target.closest('.rv-btn');
+      if (rvBtn) { setHistoryReview(Number(rvBtn.getAttribute('data-id')), rvBtn.getAttribute('data-rv')); return; }
+      var noteBtn = ev.target.closest('.rv-note-btn');
+      if (noteBtn) {
+        var id = Number(noteBtn.getAttribute('data-note-for'));
+        var cur = '';
+        var arrN = loadHistory();
+        for (var j = 0; j < arrN.length; j++) if (arrN[j].id === id) cur = arrN[j].reviewNote || '';
+        var v = window.prompt('这一步的复盘备注（如「三周后拿到offer」），留空清除：', cur);
+        if (v !== null) setHistoryNote(id, v);
+        return;
+      }
       var item = ev.target.closest('.hist-item');
       if (item) loadHistoryEntry(Number(item.getAttribute('data-id')));
     });

@@ -35,6 +35,8 @@
   // —— 问事分类与用神映射（时家奇门常用用神）——
   var ASK_CATEGORIES = ['综合', '事业', '财运', '婚姻', '健康', '学业', '出行', '官司', '寻物'];
   var currentCategory = '综合';
+  var currentBirthYear = '';
+  var currentYearMing = null;
   var currentChart = null;
   var currentQuestion = '';
   var currentContext = '';
@@ -46,6 +48,40 @@
   var currentShenSha = [];     // 本次盘的神煞列表
   var currentSSByPalace = {};  // 神煞按宫分组
   var currentYingqi = null;    // 本次盘的应期推算
+
+  var STEMS = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+  var WX_SHENG = { '木': '火', '火': '土', '土': '金', '金': '水', '水': '木' };
+  var WX_KE = { '木': '土', '土': '水', '水': '火', '火': '金', '金': '木' };
+
+  var BRANCHES = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+  // 六甲旬遁：年命为甲者，奇门以所遁之仪取值
+  var XUN_DUN = { '甲子': '戊', '甲戌': '己', '甲申': '庚', '甲午': '辛', '甲辰': '壬', '甲寅': '癸' };
+
+  // 年命 = 出生年（公历）的天干；甲命按旬首遁仪取用
+  function yearGanZhi(year) {
+    var y = parseInt(year, 10);
+    if (!y || y < 1864 || y > 2200) return '';
+    var i = ((y - 4) % 60 + 60) % 60;
+    return STEMS[i % 10] + BRANCHES[i % 12];
+  }
+
+  function yearStem(year) {
+    var gz = yearGanZhi(year);
+    if (!gz) return '';
+    var st = gz.charAt(0);
+    return st === '甲' ? (XUN_DUN[gz] || '') : st;
+  }
+
+  // 两个宫位五行的关系（以「我」为中心：年命/日干 对 用神）
+  function wxRelationText(a, b) {
+    if (!a || !b) return '';
+    if (a === b) return '比和';
+    if (WX_SHENG[a] === b) return '我生' + b;
+    if (WX_SHENG[b] === a) return '生我' + a;
+    if (WX_KE[a] === b) return '我克' + b;
+    if (WX_KE[b] === a) return '克我' + a;
+    return '';
+  }
 
   var YONGSHEN_MAP = {
     '综合': [
@@ -116,11 +152,32 @@
     return null;
   }
 
+  // 返回该干在此宫的序号：0=本宫干，>0=中五寄宫于此（-1=不在）
+  function stemIndex(p, key, stem) {
+    var v = p && p[key];
+    if (!v) return -1;
+    var i;
+    if (Object.prototype.toString.call(v) === '[object Array]') {
+      for (i = 0; i < v.length; i++) {
+        var nm = (v[i] && typeof v[i] === 'object') ? v[i].name : v[i];
+        if (nm === stem) return i;
+      }
+      return -1;
+    }
+    var nm2 = (v && typeof v === 'object') ? v.name : v;
+    return nm2 === stem ? 0 : -1;
+  }
+
   function locateStem(chart, stem) {
-    var p = findPalace(chart.palaces, function (p) { return hasName(p.heavenlyStem, stem); });
-    if (p) return { palace: p, note: '天盘' };
-    var p2 = findPalace(chart.palaces, function (p) { return hasName(p.earthlyStem, stem); });
-    return { palace: p2, note: '地盘' };
+    for (var i = 0; i < chart.palaces.length; i++) {
+      var idx = stemIndex(chart.palaces[i], 'heavenlyStem', stem);
+      if (idx >= 0) return { palace: chart.palaces[i], note: idx > 0 ? '天盘·中五寄此' : '天盘', ji: idx > 0 };
+    }
+    for (var j = 0; j < chart.palaces.length; j++) {
+      var idx2 = stemIndex(chart.palaces[j], 'earthlyStem', stem);
+      if (idx2 >= 0) return { palace: chart.palaces[j], note: idx2 > 0 ? '地盘·中五寄此' : '地盘', ji: idx2 > 0 };
+    }
+    return { palace: null, note: '', ji: false };
   }
 
   function locateYongShen(chart, item) {
@@ -194,6 +251,7 @@
     }
     renderHeader(chart);
     renderGrid(chart);
+    renderYearMing(chart);
     renderYongShen(chart);
     renderYingqi(chart);
     renderPatterns(chart);
@@ -435,6 +493,53 @@
       '</div>';
   }
 
+  // —— 年命（求测人出生年天干落宫）——
+  function computeYearMing(chart) {
+    var gz = yearGanZhi(currentBirthYear);
+    var stem = yearStem(currentBirthYear);
+    if (!stem) return null;
+    var loc = locateStem(chart, stem);
+    var note = loc.note || '';
+    if (gz.charAt(0) === '甲') note = gz + '年，甲遁' + stem + '（' + note + '）';
+    if (!loc.palace) return { stem: stem, year: currentBirthYear, gz: gz, palace: null, note: note };
+    return { stem: stem, year: currentBirthYear, gz: gz, palace: loc.palace, note: note };
+  }
+
+  function renderYearMing(chart) {
+    var box = document.getElementById('yearming');
+    if (!box) return;
+    currentYearMing = computeYearMing(chart);
+    if (!currentYearMing) { box.innerHTML = ''; box.classList.add('u-hidden'); return; }
+    box.classList.remove('u-hidden');
+    var ym = currentYearMing;
+    if (!ym.palace) {
+      box.innerHTML = '<div class="ym-card"><div class="ym-head">年命 · ' + ym.stem + '</div>' +
+        '<div class="ym-line dim">该年命天干未在九宫天盘/地盘出现（甲遁六仪，须按旬首取值），此项不作参断。</div></div>';
+      return;
+    }
+    var p = ym.palace;
+    var info = PALACE_NAME[p.position];
+    var st = p.status || {};
+    var strengths = [st.star ? '星' + st.star : '', st.gate ? '门' + st.gate : ''].filter(Boolean).join(' ');
+    var badges = ysBadges(chart, p);
+    var lines = [];
+    lines.push('<div class="ym-line">落 ' + info.name + '（' + info.dir + '）· 五行' + (p.fiveElements || '-') +
+      (strengths ? ' · ' + strengths : '') + '</div>');
+    lines.push('<div class="ym-line dim">天盘' + fmt(p.heavenlyStem) + ' 地盘' + fmt(p.earthlyStem) +
+      ' 神' + fmt(p.deity) + (badges.length ? ' · 标记[' + badges.join(',') + ']' : '') + '</div>');
+    var items = YONGSHEN_MAP[currentCategory] || [];
+    var rels = [];
+    for (var i = 0; i < items.length; i++) {
+      var loc = locateYongShen(chart, items[i]);
+      if (!loc.palace || !loc.palace.fiveElements || !p.fiveElements) continue;
+      var rel = wxRelationText(p.fiveElements, loc.palace.fiveElements);
+      if (rel) rels.push(items[i].label.replace(/·.*$/, '') + '（' + loc.palace.fiveElements + '）：' + rel);
+    }
+    if (rels.length) lines.push('<div class="ym-line dim">与用神：' + rels.join('；') + '</div>');
+    box.innerHTML = '<div class="ym-card"><div class="ym-head">年命 ' + (ym.gz || ym.stem) + '（' + ym.year + '年生 · ' + ym.note + '）</div>' +
+      lines.join('') + '</div>';
+  }
+
   function renderAskChips() {
     var box = document.getElementById('askChips');
     if (!box) return;
@@ -451,7 +556,7 @@
           for (var j = 0; j < kids.length; j++) kids[j].className = 'chip';
           el.className = 'chip active';
           syncGenderWrap();
-          if (currentSystem === 'qimen' && currentChart) { renderYongShen(currentChart); renderYingqi(currentChart); }
+          if (currentSystem === 'qimen' && currentChart) { renderYearMing(currentChart); renderYongShen(currentChart); renderYingqi(currentChart); }
           if (currentSystem === 'liuyao' && currentLiuyao && window.QimenLiuyao) window.QimenLiuyao.recastAnalysis();
           if (currentHistoryId) updateHistoryEntry(currentHistoryId, { category: cat });
         });
@@ -632,6 +737,9 @@
   function castDivination() {
     currentQuestion = document.getElementById('question').value.trim();
     currentContext = document.getElementById('context').value.trim();
+    var by = document.getElementById('birthYear');
+    var byv = by ? String(by.value || '').trim() : '';
+    currentBirthYear = yearStem(byv) ? byv : '';
 
     // 起局时间 = 点击「开始排盘」的当前时刻（正时起局）
     var d = new Date();
@@ -651,6 +759,7 @@
       question: currentQuestion,
       context: currentContext,
       category: currentCategory,
+      birthYear: currentBirthYear,
       ju: currentChart.ju.type + currentChart.ju.number + '局',
       interp: null
     };
@@ -759,6 +868,9 @@
     currentContext = e.context || '';
     currentCategory = e.category || '综合';
     currentGender = e.gender || '';
+    currentBirthYear = e.birthYear || '';
+    var byEl = document.getElementById('birthYear');
+    if (byEl) byEl.value = currentBirthYear;
 
     document.getElementById('question').value = currentQuestion;
     document.getElementById('context').value = currentContext;
@@ -885,7 +997,7 @@
     '1. 用神：先看【用神落宫】中与所问之事对应的用神落在哪一宫、该宫星门旺衰如何（旺相为有力，休囚废为无力）；\n' +
     '2. 生克：看日干（求测人自己）与用神、时干（所问之事）之间的五行生克；时干克日干为「五不遇时」主不吉；\n' +
     '3. 吉凶：看用神宫是否带凶象（门迫/击刑/入墓/空亡/凶格）或吉象（吉格/得令旺相）；\n' +
-    '4. 大势：看值符（整体环境/贵人）与值使（事体主导）落宫及其旺衰；\n' +
+    '4. 大势：看值符（整体环境/贵人）与值使（事体主导）落宫及其旺衰；若给了【年命】，还须看年命落宫与用神宫的生克（年命为我之本体，与日干同参）；\n' +
     '5. 应期：优先采用【应期推算】给出的远近尺度（近快按日/时、远慢按月/年）、应期支与事期宫数，' +
       '结合驿马、空亡、入墓等因素说明理由；若【应期推算】标为「难定」或依据不足，直接写「应期不明」，不可自造日期；\n' +
     '6. 建议：依据以上吉凶给出趋吉避凶的具体建议，紧扣排盘数据，不空谈、不夸大。\n' +
@@ -1101,6 +1213,27 @@
     L.push('日干' + fp.day.stem + '（属' + (STEM_WUXING[fp.day.stem] || '?') + '）＝求测人自己；' +
       '时干' + fp.hour.stem + '（属' + (STEM_WUXING[fp.hour.stem] || '?') + '）＝所问之事');
     L.push('');
+    if (currentYearMing && currentYearMing.palace) {
+      var ymp = currentYearMing.palace;
+      var ymi = PALACE_NAME[ymp.position];
+      L.push('【年命】');
+      L.push('求测人年命' + currentYearMing.stem + '（' + currentYearMing.year + '年生）落' + ymi.name +
+        '（' + ymi.dir + '，五行' + (ymp.fiveElements || '-') + '，' + currentYearMing.note + '）');
+      var ymBadges = ysBadges(chart, ymp);
+      if (ymBadges.length) L.push('年命宫标记：' + ymBadges.join('、'));
+      var rels = [];
+      var ymItems = YONGSHEN_MAP[category] || [];
+      for (var yi = 0; yi < ymItems.length; yi++) {
+        var yloc = locateYongShen(chart, ymItems[yi]);
+        if (!yloc.palace || !yloc.palace.fiveElements) continue;
+        var rel = wxRelationText(ymp.fiveElements, yloc.palace.fiveElements);
+        if (rel) rels.push(ymItems[yi].label + '：' + rel);
+      }
+      if (rels.length) L.push('年命与用神：' + rels.join('；'));
+      L.push('口径：年命代表求测人本体，与日干同参；年命生扶用神为助，年命受用神克为受制。');
+      L.push('');
+    }
+
     L.push('【用神落宫】');
     var items = YONGSHEN_MAP[category] || [];
     for (var i = 0; i < items.length; i++) {

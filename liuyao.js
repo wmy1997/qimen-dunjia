@@ -501,13 +501,26 @@
         (s.kongWangState && s.kongWangState !== 'not_kong' ? '，旬空' : '') +
         ((s.evidence || []).length ? '（' + s.evidence.join('；') + '）' : ''));
       if (grp.selectionNote) L.push('  取舍：' + grp.selectionNote);
+      // 用神两现：把另一爻的旺衰/动静一并交给模型，避免只凭一爻定吉凶
+      var cands = (grp.candidates || []).filter(function (c) { return c.position !== s.position; });
+      cands.forEach(function (c) {
+        L.push('  另见' + YAO_POS[(c.position || 1) - 1] + '，' + (c.liuQin || '') + (c.naJia || '') + (c.element || '') +
+          '，' + (c.strengthLabel || '') + '，' + (c.movementLabel || '') +
+          (c.kongWangState && c.kongWangState !== 'not_kong' ? '，旬空' : '') +
+          (c.isShiYao ? '，持世' : '') +
+          ((c.evidence || []).length ? '（' + c.evidence.join('；') + '）' : ''));
+      });
     });
     var sys = out.shenSystemByYongShen || [];
     if (sys.length) {
       L.push('');
       L.push('【原忌仇神】');
       sys.forEach(function (s) {
-        var f = function (o) { return o ? (o.liuQin + o.wuXing + (o.positions || []).length ? '（' + (o.positions || []).map(function (p) { return YAO_POS[p - 1]; }).join('、') + '）' : '') : '—'; };
+        var f = function (o) {
+          if (!o) return '—';
+          var ps = (o.positions || []).map(function (p) { return YAO_POS[p - 1]; }).join('、');
+          return o.liuQin + o.wuXing + (ps ? '（' + ps + '）' : '');
+        };
         L.push('- ' + s.targetLiuQin + '：原神 ' + f(s.yuanShen) + '；忌神 ' + f(s.jiShen) + '；仇神 ' + f(s.chouShen));
       });
     }

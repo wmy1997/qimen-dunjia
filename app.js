@@ -1942,10 +1942,47 @@
 
     document.getElementById('btnCast').addEventListener('click', castDivination);
 
-    // 阶段4：注册 Service Worker（仅 http(s)/localhost；file:// 不注册）
-    if (location.protocol !== 'file:' && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').catch(function () {});
-    }
+    initUpdate();
+  }
+
+  // —— 版本与自动更新 ——
+  var APP_VER = 'v18';
+
+  function showUpdateToast(show) {
+    var t = document.getElementById('updateToast');
+    if (t) t.classList.toggle('u-hidden', !show);
+  }
+
+  function initUpdate() {
+    var ver = document.getElementById('appVer');
+    if (ver) ver.textContent = APP_VER;
+
+    var btnNow = document.getElementById('btnUpdateNow');
+    var btnLater = document.getElementById('btnUpdateLater');
+    if (btnNow) btnNow.addEventListener('click', function () { location.reload(); });
+    if (btnLater) btnLater.addEventListener('click', function () { showUpdateToast(false); });
+
+    if (location.protocol === 'file:' || !('serviceWorker' in navigator)) return;
+
+    var hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      // 首次安装也会触发，只有原本已有 SW 时才算“更新完成”
+      if (hadController) showUpdateToast(true);
+    });
+
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(function (reg) {
+      function check() {
+        reg.update().then(function () {
+          if (hadController && reg.waiting) showUpdateToast(true);
+        }).catch(function () {});
+      }
+      check();
+      // 从后台切回前台（iOS 主屏应用多为唤醒而非重启）时再查一次
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) check();
+      });
+      setInterval(check, 20 * 60 * 1000);
+    }).catch(function () {});
   }
 
   if (document.readyState === 'loading') {

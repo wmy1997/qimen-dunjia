@@ -590,3 +590,20 @@ input, textarea, select { font-size: 16px; }
 .hist-status { font-size: 12px; color: var(--muted); padding: 2px 2px 8px; line-height: 1.6; }
 .hist-warn { display: block; color: var(--red); font-size: 12px; }
 .hist-empty .link-btn { margin-left: 8px; }
+
+/* —— 新版本提示条 —— */
+.update-toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 50;
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 12px;
+  background: var(--panel); border: 1px solid var(--gold);
+  box-shadow: 0 6px 22px rgba(67, 56, 42, 0.18);
+  font-size: 13px; color: var(--text); max-width: calc(100% - 24px);
+}
+.update-toast button {
+  font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 8px;
+  border: 1px solid var(--gold); background: var(--gold); color: #fff; cursor: pointer;
+}
+.update-toast .toast-x {
+  background: transparent; color: var(--muted); border-color: var(--border); padding: 4px 8px;
+}

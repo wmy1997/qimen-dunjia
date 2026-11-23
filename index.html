@@ -191,8 +191,14 @@
   <footer class="app-footer">
     排盘内核 <a href="https://github.com/3metaJun/3meta" target="_blank" rel="noopener">3meta</a> /
     <a href="https://github.com/hhszzzz/taibu" target="_blank" rel="noopener">taibu-core</a>（均 MIT License）·
-    按北京时间起局 · 仅供自用参考，勿用于非法用途 · by wmy
+    按北京时间起局 · 仅供自用参考，勿用于非法用途 · by wmy · <span id="appVer"></span>
   </footer>
+
+  <div id="updateToast" class="update-toast u-hidden">
+    <span>发现新版本</span>
+    <button id="btnUpdateNow" type="button">立即更新</button>
+    <button id="btnUpdateLater" type="button" class="toast-x" aria-label="稍后">✕</button>
+  </div>
 
   <script src="vendor/3meta.min.js"></script>
   <script src="rules.js"></script>

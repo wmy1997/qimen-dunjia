@@ -782,6 +782,9 @@
   var HISTORY_KEY = 'qimen_history_v1';
   var HISTORY_MAX = 50;
 
+  var lastSaveOk = true;
+  var lastSlimLevel = 0;
+
   function loadHistory() {
     try {
       var raw = localStorage.getItem(HISTORY_KEY);
@@ -790,8 +793,61 @@
     } catch (e) { return []; }
   }
 
+  // 逐级瘦身：空间不够时优先丢“深度思考原文”和追问记录，保住条目本身
+  function slimHistory(arr, level) {
+    var out = arr.map(function (e) { return e; });
+    if (level === 1) {
+      out = out.map(function (e) {
+        if (!e.interp) return e;
+        var c = { answer: e.interp.answer, mode: e.interp.mode };
+        if (e.interp.reasoning) c.reasoning = String(e.interp.reasoning).slice(0, 3000);
+        if (e.interp.chat && e.interp.chat.length) c.chat = e.interp.chat.slice(-4);
+        return Object.assign({}, e, { interp: c });
+      });
+    } else if (level === 2) {
+      out = out.map(function (e) {
+        if (!e.interp) return e;
+        return Object.assign({}, e, { interp: { answer: e.interp.answer, mode: e.interp.mode } });
+      });
+    } else if (level === 3) {
+      out = out.slice(0, 10).map(function (e, i) {
+        if (i === 0 || !e.interp) return e;
+        return Object.assign({}, e, { interp: { answer: e.interp.answer, mode: e.interp.mode } });
+      });
+    } else if (level >= 4) {
+      out = out.slice(0, 5).map(function (e) {
+        var c = Object.assign({}, e); delete c.interp; return c;
+      });
+    }
+    return out;
+  }
+
   function saveHistory(arr) {
-    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(arr)); } catch (e) {}
+    // 覆盖前留一份上一版快照，供“历史丢失”时恢复
+    try {
+      var prev = localStorage.getItem(HISTORY_KEY);
+      if (prev && prev.length <= 400000) localStorage.setItem(HISTORY_KEY + '_bak', prev);
+    } catch (e) {}
+    var payload = arr, ok = false;
+    lastSlimLevel = 0;
+    for (var attempt = 0; attempt < 6; attempt++) {
+      try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(payload));
+        ok = true;
+        break;
+      } catch (e) {
+        var next = slimHistory(payload, attempt + 1);
+        if (JSON.stringify(next) === JSON.stringify(payload)) break;
+        payload = next;
+        lastSlimLevel = attempt + 1;
+      }
+    }
+    lastSaveOk = ok;
+    return ok;
+  }
+
+  function historyBytes() {
+    try { var raw = localStorage.getItem(HISTORY_KEY); return raw ? raw.length : 0; } catch (e) { return 0; }
   }
 
   function addHistoryEntry(entry) {
@@ -849,13 +905,36 @@
     var list = document.getElementById('historyList');
     if (!list) return;
     var arr = loadHistory();
+    var bak = '';
+    try { bak = localStorage.getItem(HISTORY_KEY + '_bak') || ''; } catch (e) {}
+    var status = document.getElementById('histStatus');
+    if (status) {
+      var kb = Math.round(historyBytes() / 1024);
+      status.innerHTML = '本地已存 ' + arr.length + ' 条 · ' + kb + 'KB' +
+        (lastSaveOk ? '' : '<span class="hist-warn">· 存储空间已满，本次未能保存（建议导出后清空）</span>') +
+        (!lastSaveOk || !lastSlimLevel ? '' : '<span class="hist-warn">· 空间不足，较早记录已自动精简思考原文</span>') +
+        '<span class="hist-warn">· 建议定期导出备份</span>';
+    }
     if (!arr.length) {
-      list.innerHTML = '<div class="hist-empty">暂无历史记录</div>';
+      list.innerHTML = '<div class="hist-empty">暂无历史记录' +
+        (bak ? '<button class="link-btn" type="button" id="btnRestoreBak">恢复上次备份</button>' : '') +
+        '</div>';
       return;
     }
     var html = '';
     for (var i = 0; i < arr.length; i++) html += historyItemHtml(arr[i]);
     list.innerHTML = html;
+  }
+
+  function restoreHistoryBackup() {
+    var bak = '';
+    try { bak = localStorage.getItem(HISTORY_KEY + '_bak') || ''; } catch (e) {}
+    if (!bak) return;
+    var arr;
+    try { arr = JSON.parse(bak); } catch (e) { return; }
+    if (!Array.isArray(arr) || !arr.length) return;
+    saveHistory(arr);
+    renderHistoryList();
   }
 
   function setCategoryChip(cat) {
@@ -972,6 +1051,8 @@
     });
     var list = document.getElementById('historyList');
     if (list) list.addEventListener('click', function (ev) {
+      var rb = ev.target.closest('#btnRestoreBak');
+      if (rb) { restoreHistoryBackup(); return; }
       var rvBtn = ev.target.closest('.rv-btn');
       if (rvBtn) { setHistoryReview(Number(rvBtn.getAttribute('data-id')), rvBtn.getAttribute('data-rv')); return; }
       var noteBtn = ev.target.closest('.rv-note-btn');

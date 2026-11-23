@@ -40,7 +40,13 @@
   var currentChart = null;
   var currentQuestion = '';
   var currentContext = '';
-  var currentHistoryId = null; // 当前问卦在历史记录里的 id（未保存为 null）
+  var currentHistoryId = null;
+  // 追问（同一盘多轮）
+  var FU_MAX = 5;
+  var currentChat = [];      // [{role,content}] 不含 system
+  var currentSysPrompt = '';
+  var fuRounds = 0;
+  var fuBusy = false; // 当前问卦在历史记录里的 id（未保存为 null）
   var currentSystem = 'liuyao'; // 当前体系：liuyao（六爻）| qimen（奇门）
   var currentGender = '';       // 六爻婚姻类用神取法：''（不限）| male | female
   var currentLiuyao = null;     // 六爻最近一次装卦结果（taibu 输出）
@@ -865,10 +871,24 @@
   function restoreInterp(e) {
     var out = document.getElementById('interpOut');
     if (!out) return;
-    out.innerHTML = e.interp
-      ? '<details class="reason-box"><summary>深度思考原文（模型内部推理，可能中英混杂，仅供参考）</summary><div class="reason-body">' + esc(cleanCoT(e.interp.reasoning || '')) + '</div></details>' +
-        '<div class="answer-box">' + mdToHtml(e.interp.answer || '') + '</div>'
-      : '';
+    if (!e.interp) { out.innerHTML = ''; showFollowup(false); return; }
+    var html = '<details class="reason-box"><summary>深度思考原文（模型内部推理，可能中英混杂，仅供参考）</summary><div class="reason-body">' + esc(cleanCoT(e.interp.reasoning || '')) + '</div></details>' +
+      '<div class="answer-box">' + renderInterpHtml(e.interp.answer || '') + '</div>';
+    // 恢复追问轮次
+    var chat = e.interp.chat || [];
+    currentSysPrompt = '';
+    currentChat = chat.slice();
+    fuRounds = Math.max(0, Math.floor(chat.length / 2) - 1);
+    if (chat.length > 2) {
+      for (var i = 2; i < chat.length; i += 2) {
+        var u = chat[i] || {}, a = chat[i + 1] || {};
+        html += '<div class="fu-turn">' + chatBubbleHtml('user', u.content || '') +
+          '<div class="fu-bubble fu-ai">' + mdToHtml(a.content || '') + '</div></div>';
+      }
+    }
+    if (e.interp.mode && INTERP_MODES[e.interp.mode]) currentMode = e.interp.mode;
+    out.innerHTML = html;
+    showFollowup(chat.length > 0);
   }
 
   function loadHistoryEntry(id) {
@@ -1035,28 +1055,42 @@
 
   // —— 阶段3：DeepSeek 流式解读 ——
   var SETTINGS_KEY = 'qimen_settings_v1';
-  var SYSTEM_PROMPT = '你是一位精通奇门遁甲的老师。请严格依据下方提供的排盘数据与用神落宫做白话解读，排盘数据之外的信息一律不要编造。\n' +
-    '断卦按以下逻辑逐步分析：\n' +
-    '1. 用神：先看【用神落宫】中与所问之事对应的用神落在哪一宫、该宫星门旺衰如何（旺相为有力，休囚废为无力）；\n' +
-    '2. 生克：看日干（求测人自己）与用神、时干（所问之事）之间的五行生克；时干克日干为「五不遇时」主不吉；\n' +
-    '3. 吉凶：看用神宫是否带凶象（门迫/击刑/入墓/空亡/凶格）或吉象（吉格/得令旺相）；\n' +
-    '4. 大势：看值符（整体环境/贵人）与值使（事体主导）落宫及其旺衰；若给了【年命】，还须看年命落宫与用神宫的生克（年命为我之本体，与日干同参）；\n' +
-    '5. 应期：优先采用【应期推算】给出的远近尺度（近快按日/时、远慢按月/年）、应期支与事期宫数，' +
-      '结合驿马、空亡、入墓等因素说明理由；若【应期推算】标为「难定」或依据不足，直接写「应期不明」，不可自造日期；\n' +
-    '6. 建议：依据以上吉凶给出趋吉避凶的具体建议，紧扣排盘数据，不空谈、不夸大。\n' +
-    '输出要求：\n' +
-    '1. 分点输出：当前局势、发展趋势、吉凶关键点、具体建议、应期（若可判断）；\n' +
-    '2. 术语可保留，但需用白话解释；\n' +
-    '3. 客观中立、不绝对化、不制造焦虑；\n' +
-    '4. 排盘数据不足以支撑某个判断时，直接说「依据不足」，不要臆测；神煞只作辅助参断（贵人/文昌/禄神等吉神可增其力，羊刃/桃花等须结合用神与格局看），不可单凭神煞定吉凶；\n' +
-    '5. 结尾附一句「本解读仅供娱乐参考，人生决策请结合现实理性判断」。' +
-    '\n另外：思考过程（reasoning）请尽量使用中文书写，便于阅读。';
+  // —— 解读模式：极简 / 简明 ——
+  var INTERP_MODES = {
+    brief: { label: '极简', total: 400, basis: 100 },
+    std:   { label: '简明', total: 800, basis: 200 }
+  };
+  var currentMode = 'std';
+
+  function buildSystemPrompt(mode) {
+    var m = INTERP_MODES[mode] || INTERP_MODES.std;
+    return '你是一位精通奇门遁甲的断卦老师。请严格依据下方排盘数据解读，数据之外一律不编造。读者在手机上看，最怕长篇幅分析。\n' +
+      '必须严格按以下四个标记分段输出，标记原样保留，不要增删段落、不要写其他段：\n' +
+      '【一句话结论】\n' +
+      '≤60字。直接给倾向（成／不成、去／不去、可／不可、快／慢）与最核心理由，不铺垫、不复述盘面。\n' +
+      '【三个关键点】\n' +
+      '恰好3条，每条≤35字，各自独立成行，以「- 」开头。只写最影响结果的因素。\n' +
+      '【依据】\n' +
+      '不超过' + m.basis + '字。说明断卦逻辑：用神落宫与旺衰、日干时干与用神生克、吉凶象、值符值使大势、年命（若给出）。同一事实只讲一次，不得复述上面已说过的内容。\n' +
+      '【建议】\n' +
+      '2~3条，每条≤45字，以「- 」开头，必须是能立刻执行的动作。\n' +
+      '硬性要求：\n' +
+      '- 全文不超过 ' + m.total + ' 字，宁短不长；\n' +
+      '- 术语首次出现用括号白话解释，之后直接用；\n' +
+      '- 依据不足就写「依据不足」，不可自造应期与确切日期；应期优先用【应期推算】，标「难定」就写「应期不明」；\n' +
+      '- 神煞只作辅助参断，不可单凭神煞定吉凶；\n' +
+      '- 客观中立，不绝对化，不制造焦虑；\n' +
+      '- 最后单独一行写：本解读仅供娱乐参考，人生决策请结合现实理性判断。\n' +
+      '- 思考过程用中文、简明扼要，控制在3000字以内，不要反复自我检查。';
+  }
+
+  var SYSTEM_PROMPT = buildSystemPrompt('std');
 
   var DEFAULT_BASE = 'https://api.ohmygpt.com/v1';
   var DEFAULT_MODEL = 'deepseek/deepseek-v4.1-flash-1017';
 
   function loadSettings() {
-    var s = { apiKey: '', baseUrl: DEFAULT_BASE, model: DEFAULT_MODEL, effort: 'max' };
+    var s = { apiKey: '', baseUrl: DEFAULT_BASE, model: DEFAULT_MODEL, effort: 'max', interpMode: 'std' };
     try {
       var raw = localStorage.getItem(SETTINGS_KEY);
       if (raw) {
@@ -1066,6 +1100,7 @@
           s.baseUrl = j.baseUrl;
           if (j.model) s.model = j.model;
           if (j.effort) s.effort = j.effort;
+        if (j.interpMode && INTERP_MODES[j.interpMode]) s.interpMode = j.interpMode;
         } else if (j.model && j.model.indexOf('deepseek/') >= 0) {
           // 旧版存过第三方模型名 → 视为第三方源
           s.model = j.model;
@@ -1338,6 +1373,53 @@
     return html;
   }
 
+  // —— 结构化解读渲染：结论卡 / 关键点 / 依据（折叠）/ 建议 ——
+  function parseInterp(text) {
+    var t = String(text || '');
+    function seg(startMark, ends) {
+      var i = t.indexOf(startMark);
+      if (i < 0) return '';
+      var from = i + startMark.length, to = t.length;
+      for (var k = 0; k < ends.length; k++) {
+        var j = t.indexOf(ends[k], from);
+        if (j >= 0 && j < to) to = j;
+      }
+      return t.slice(from, to).trim();
+    }
+    var concl = seg('【一句话结论】', ['【三个关键点】', '【关键点】', '【依据】', '【建议】']);
+    var ptsRaw = seg('【三个关键点】', ['【依据】', '【建议】']) || seg('【关键点】', ['【依据】', '【建议】']);
+    var basis = seg('【依据】', ['【建议】']);
+    var advice = seg('【建议】', []);
+    advice = advice.replace(/本解读仅供娱乐参考[^\n]*/g, '').trim();
+    var points = ptsRaw.split(/\n+/).map(function (x) {
+      return x.replace(/^[-*•\d.、）)\s]+/, '').trim();
+    }).filter(function (x) { return x; });
+    if (!concl && !points.length && !basis) return null;
+    return { conclusion: concl, points: points, basis: basis, advice: advice };
+  }
+
+  function renderInterpHtml(text) {
+    var p = parseInterp(text);
+    if (!p) return mdToHtml(text);
+    var h = [];
+    if (p.conclusion) {
+      h.push('<div class="i-concl"><div class="i-concl-label">结论</div><div class="i-concl-text">' + esc(p.conclusion) + '</div></div>');
+    }
+    if (p.points.length) {
+      h.push('<div class="i-points">' + p.points.map(function (x) {
+        return '<div class="i-point"><span class="i-dot">·</span>' + esc(x) + '</div>';
+      }).join('') + '</div>');
+    }
+    if (p.basis) {
+      h.push('<details class="i-basis"><summary>依据 · 断卦逻辑（点开）</summary><div class="i-basis-body">' + mdToHtml(p.basis) + '</div></details>');
+    }
+    if (p.advice) {
+      h.push('<div class="i-advice"><div class="i-advice-label">建议</div>' + mdToHtml(p.advice) + '</div>');
+    }
+    h.push('<div class="i-disclaim">本解读仅供娱乐参考，人生决策请结合现实理性判断</div>');
+    return h.join('');
+  }
+
   // 思考原文只做展示：清掉裸控制字符与替换符，避免出现视觉上的乱码
   function cleanCoT(t) {
     return String(t || '')
@@ -1433,7 +1515,12 @@
     var prompt = isLY && window.QimenLiuyao
       ? window.QimenLiuyao.buildPrompt(currentLiuyao, currentQuestion, currentContext, currentCategory, currentGender)
       : buildInterpretPrompt(currentChart, currentQuestion, currentContext, currentCategory);
-    var sysPrompt = isLY && window.QimenLiuyao ? window.QimenLiuyao.SYSTEM_PROMPT : SYSTEM_PROMPT;
+    var sysPrompt = isLY && window.QimenLiuyao
+      ? window.QimenLiuyao.systemPrompt(currentMode)
+      : buildSystemPrompt(currentMode);
+    currentSysPrompt = sysPrompt;
+    currentChat = [];
+    fuRounds = 0;
     if (btnI) { btnI.disabled = true; btnI.textContent = '🔮 解读中…'; }
     out.innerHTML =
       '<details class="reason-box"><summary>深度思考原文（模型内部推理，可能中英混杂，仅供参考）</summary><div class="reason-body" id="reasonBody"></div></details>' +
@@ -1499,18 +1586,167 @@
       function () {
         clearInterval(elapsedTimer);
         if (rafTimer) { clearTimeout(rafTimer); rafTimer = null; }
-        flushReason();
+        if (answerBox && answerBuf) answerBox.innerHTML = renderInterpHtml(answerBuf);
+        if (reasonBody) reasonBody.textContent = cleanCoT(reasonBuf);
+        currentChat = [
+          { role: 'user', content: prompt },
+          { role: 'assistant', content: answerBuf }
+        ];
+        fuRounds = 0;
+        showFollowup(true);
         if (currentHistoryId && (reasonBuf || answerBuf)) {
-          updateHistoryEntry(currentHistoryId, { interp: { reasoning: reasonBuf, answer: answerBuf } });
+          updateHistoryEntry(currentHistoryId, { interp: { reasoning: reasonBuf, answer: answerBuf, chat: currentChat, mode: currentMode } });
           renderHistoryList();
         }
         if (btnI) { btnI.disabled = false; btnI.textContent = '🔮 AI 解读'; }
       });
   }
 
+  // —— 追问：沿用同一盘，不重新起局 ——
+  var FU_QUICK = {
+    qimen: ['我该重点注意什么？', '是谁／什么在阻碍？', '如果选另一条会怎样？', '什么时候能看到结果？'],
+    liuyao: ['我该重点注意什么？', '对方是什么态度？', '这事成的话大概什么时候？', '有没有被忽略的风险？']
+  };
+
+  function showFollowup(on) {
+    var box = document.getElementById('followup');
+    if (!box) return;
+    box.classList.toggle('u-hidden', !on);
+    if (!on) return;
+    var chips = document.getElementById('fuChips');
+    var sys = currentSystem === 'liuyao' ? 'liuyao' : 'qimen';
+    if (chips) {
+      chips.innerHTML = FU_QUICK[sys].map(function (q) {
+        return '<button class="fu-chip" type="button" data-q="' + esc(q) + '">' + esc(q) + '</button>';
+      }).join('');
+    }
+    updateFuTip();
+  }
+
+  function updateFuTip() {
+    var tip = document.getElementById('fuTip');
+    if (tip) {
+      var left = FU_MAX - fuRounds;
+      tip.textContent = '追问沿用这一盘，不重新起局（同一件事问细节是正统做法）· 还可追问 ' + left + ' 轮';
+    }
+  }
+
+  function chatBubbleHtml(role, text) {
+    if (role === 'user') return '<div class="fu-bubble fu-me">' + esc(text) + '</div>';
+    return '<div class="fu-bubble fu-ai">' + mdToHtml(text) + '</div>';
+  }
+
+  function askFollowup(q) {
+    var text = String(q || '').trim();
+    if (!text || fuBusy) return;
+    if (fuRounds >= FU_MAX) return;
+    if (!currentChat.length) return;
+    var s = loadSettings();
+    if (!s.apiKey) { showSettingsHint(); return; }
+    var out = document.getElementById('interpOut');
+    if (!out) return;
+    var input = document.getElementById('fuInput');
+    if (input) input.value = '';
+    fuBusy = true;
+    fuRounds++;
+    updateFuTip();
+    var btn = document.getElementById('btnFollowup');
+    if (btn) { btn.disabled = true; btn.textContent = '…'; }
+
+    var holder = document.createElement('div');
+    holder.className = 'fu-turn';
+    holder.innerHTML = chatBubbleHtml('user', text) + '<div class="fu-bubble fu-ai" id="fuStreaming"><span class="typing">思考中…</span></div>';
+    out.appendChild(holder);
+    var streamBox = holder.querySelector('#fuStreaming');
+    holder.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    var messages = [{ role: 'system', content: currentSysPrompt }];
+    for (var i = 0; i < currentChat.length; i++) messages.push(currentChat[i]);
+    messages.push({ role: 'user', content: text });
+
+    var buf = '';
+    var timer = null;
+    function flush() { timer = null; if (streamBox) streamBox.innerHTML = mdToHtml(buf); }
+    function sched() { if (!timer) timer = setTimeout(flush, 150); }
+
+    callDeepSeek(s, messages,
+      function () {},
+      function (ct) { buf += ct; sched(); },
+      function (err) {
+        fuBusy = false;
+        if (btn) { btn.disabled = false; btn.textContent = '问'; }
+        if (streamBox) streamBox.innerHTML = '<span class="interp-err">' + esc(err) + '</span>';
+      },
+      function () {
+        fuBusy = false;
+        if (timer) { clearTimeout(timer); timer = null; }
+        if (streamBox) { streamBox.innerHTML = mdToHtml(buf); streamBox.removeAttribute('id'); }
+        currentChat.push({ role: 'user', content: text });
+        currentChat.push({ role: 'assistant', content: buf });
+        if (currentHistoryId && buf) {
+          var arr = loadHistory();
+          for (var j = 0; j < arr.length; j++) {
+            if (arr[j].id === currentHistoryId && arr[j].interp) {
+              arr[j].interp.chat = currentChat;
+              saveHistory(arr);
+              break;
+            }
+          }
+        }
+        if (btn) { btn.disabled = false; btn.textContent = '问'; }
+        updateFuTip();
+      });
+  }
+
+  function showSettingsHint() {
+    var panel = document.getElementById('interpSettings');
+    if (panel) panel.classList.remove('u-hidden');
+    var ak = document.getElementById('apiKey');
+    if (ak) ak.focus();
+  }
+
+  function initFollowup() {
+    var chips = document.getElementById('fuChips');
+    if (chips) chips.addEventListener('click', function (ev) {
+      var b = ev.target.closest('.fu-chip');
+      if (b) askFollowup(b.getAttribute('data-q'));
+    });
+    var btn = document.getElementById('btnFollowup');
+    if (btn) btn.addEventListener('click', function () {
+      askFollowup(document.getElementById('fuInput').value);
+    });
+    var input = document.getElementById('fuInput');
+    if (input) input.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); askFollowup(input.value); }
+    });
+    var modeBox = document.getElementById('interpMode');
+    if (modeBox) modeBox.addEventListener('click', function (ev) {
+      var b = ev.target.closest('.mode-btn');
+      if (!b) return;
+      setInterpMode(b.getAttribute('data-mode'));
+    });
+  }
+
+  function setInterpMode(mode) {
+    if (!INTERP_MODES[mode]) return;
+    currentMode = mode;
+    var btns = document.querySelectorAll('#interpMode .mode-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('active', btns[i].getAttribute('data-mode') === mode);
+    }
+    var s = loadSettings();
+    s.interpMode = mode;
+    saveSettings(s);
+  }
+
   function initSettings() {
     var s = loadSettings();
     applySettingsToUI(s);
+    currentMode = s.interpMode || 'std';
+    var mbtns = document.querySelectorAll('#interpMode .mode-btn');
+    for (var mi = 0; mi < mbtns.length; mi++) {
+      mbtns[mi].classList.toggle('active', mbtns[mi].getAttribute('data-mode') === currentMode);
+    }
 
     function persist(flash) {
       var cur = readSettingsFromUI();
@@ -1594,6 +1830,7 @@
     var btnAgain = document.getElementById('btnAskAgain');
     if (btnAgain) btnAgain.addEventListener('click', askAgain);
     initSettings();
+    initFollowup();
     initHistory();
     initAutoGrow();
 

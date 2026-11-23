@@ -1946,7 +1946,8 @@
   }
 
   // —— 版本与自动更新 ——
-  var APP_VER = 'v18';
+  // 每次发布同时改这里（vNN · YYMMDD）和 sw.js 的 CACHE（qimen-vNN），两处必须一致
+  var APP_VER = 'v19 · 261123';
 
   function showUpdateToast(show) {
     var t = document.getElementById('updateToast');

@@ -579,3 +579,9 @@ input, textarea, select { font-size: 16px; }
 .fu-bubble { font-size: 14px; line-height: 1.7; border-radius: 12px; padding: 10px 13px; margin-bottom: 8px; }
 .fu-me { background: rgba(169,126,58,.12); color: var(--text); border: 1px solid rgba(169,126,58,.3); }
 .fu-ai { background: var(--cell); border: 1px solid var(--border); color: var(--text); }
+
+/* —— 应期 / 风险小段 —— */
+.i-block { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin: 0 0 10px; background: var(--cell); }
+.i-block-label { font-size: 11px; letter-spacing: .12em; color: var(--gold); margin-bottom: 6px; }
+.i-risk .i-block-label { color: var(--red); }
+.i-block-body { font-size: 13.5px; line-height: 1.75; color: var(--text); }

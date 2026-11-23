@@ -1057,34 +1057,46 @@
   var SETTINGS_KEY = 'qimen_settings_v1';
   // —— 解读模式：极简 / 简明 ——
   var INTERP_MODES = {
-    brief: { label: '极简', total: 400, basis: 100 },
-    std:   { label: '简明', total: 800, basis: 200 }
+    brief: { label: '极简', total: 800, basis: 350, extra: false },
+    std:   { label: '简明', total: 1400, basis: 900, extra: true }
   };
   var currentMode = 'std';
 
   function buildSystemPrompt(mode) {
     var m = INTERP_MODES[mode] || INTERP_MODES.std;
-    return '你是一位精通奇门遁甲的断卦老师。请严格依据下方排盘数据解读，数据之外一律不编造。读者在手机上看，最怕长篇幅分析。\n' +
-      '必须严格按以下四个标记分段输出，标记原样保留，不要增删段落、不要写其他段：\n' +
+    var ck = '【依据】请按下列断卦要点逐条展开，每条以「- 」开头，未涉及的要点跳过：\n' +
+      '- 用神取谁、落何宫、旺衰（旺相休囚死）\n' +
+      '- 用神与日干、时干的五行生克\n' +
+      '- 吉凶格、门迫门制、空亡、入墓等具体象\n' +
+      '- 值符、值使所主的大势与推进节奏\n' +
+      '- 年命落宫及其与用神的生克（若给出）\n' +
+      '- 神煞（只作辅助，须说明不单凭此断吉凶）\n';
+    var extra = !m.extra ? '' :
+      '【应期】\n' +
+      '不超过120字。只写时间线索与推断依据（配合【应期推算】）。不得编造具体日期，判不出就写「应期不明」。\n' +
+      '【风险】\n' +
+      '不超过100字，2条以内。写这一局最可能出问题的那一环，要具体（如合同承诺、口舌是非、流程拖延），不要泛泛而谈。\n';
+    return '你是一位精通奇门遁甲的断卦老师。请严格依据下方排盘数据解读，数据之外一律不编造。读者在手机上看，最怕长篇幅铺垫。\n' +
+      '必须严格按以下标记分段输出，标记原样保留，不要增删段落、不要写其他段：\n' +
       '【一句话结论】\n' +
       '≤60字。直接给倾向（成／不成、去／不去、可／不可、快／慢）与最核心理由，不铺垫、不复述盘面。\n' +
       '【三个关键点】\n' +
       '恰好3条，每条≤35字，各自独立成行，以「- 」开头。只写最影响结果的因素。\n' +
-      '【依据】\n' +
-      '不超过' + m.basis + '字。说明断卦逻辑：用神落宫与旺衰、日干时干与用神生克、吉凶象、值符值使大势、年命（若给出）。同一事实只讲一次，不得复述上面已说过的内容。\n' +
+      ck.replace('【依据】请按下列断卦要点逐条展开，每条以「- 」开头，未涉及的要点跳过：', '【依据】\n不超过' + m.basis + '字。按下列断卦要点逐条展开，每条以「- 」开头，未涉及的要点跳过：') +
+      extra +
       '【建议】\n' +
       '2~3条，每条≤45字，以「- 」开头，必须是能立刻执行的动作。\n' +
       '硬性要求：\n' +
       '- 全文不超过 ' + m.total + ' 字，宁短不长；\n' +
+      '- 同一事实与同一术语不要反复重述（同一术语在【依据】中出现不超过2次）；\n' +
       '- 术语首次出现用括号白话解释，之后直接用；\n' +
-      '- 依据不足就写「依据不足」，不可自造应期与确切日期；应期优先用【应期推算】，标「难定」就写「应期不明」；\n' +
-      '- 神煞只作辅助参断，不可单凭神煞定吉凶；\n' +
+      '- 依据不足就写「依据不足」，不可自造应期与确切日期；\n' +
       '- 客观中立，不绝对化，不制造焦虑；\n' +
       '- 最后单独一行写：本解读仅供娱乐参考，人生决策请结合现实理性判断。\n' +
       '- 思考过程用中文、简明扼要，控制在3000字以内，不要反复自我检查。';
   }
 
-  var SYSTEM_PROMPT = buildSystemPrompt('std');
+  var SYSTEM_PROMPT = buildSystemPrompt('std');  var SYSTEM_PROMPT = buildSystemPrompt('std');
 
   var DEFAULT_BASE = 'https://api.ohmygpt.com/v1';
   var DEFAULT_MODEL = 'deepseek/deepseek-v4.1-flash-1017';
@@ -1386,16 +1398,19 @@
       }
       return t.slice(from, to).trim();
     }
+    var TAIL = ['【应期】', '【风险】', '【建议】'];
     var concl = seg('【一句话结论】', ['【三个关键点】', '【关键点】', '【依据】', '【建议】']);
-    var ptsRaw = seg('【三个关键点】', ['【依据】', '【建议】']) || seg('【关键点】', ['【依据】', '【建议】']);
-    var basis = seg('【依据】', ['【建议】']);
+    var ptsRaw = seg('【三个关键点】', ['【依据】'].concat(TAIL)) || seg('【关键点】', ['【依据】'].concat(TAIL));
+    var basis = seg('【依据】', TAIL);
+    var yingqi = seg('【应期】', ['【风险】', '【建议】']);
+    var risk = seg('【风险】', ['【建议】']);
     var advice = seg('【建议】', []);
     advice = advice.replace(/本解读仅供娱乐参考[^\n]*/g, '').trim();
     var points = ptsRaw.split(/\n+/).map(function (x) {
       return x.replace(/^[-*•\d.、）)\s]+/, '').trim();
     }).filter(function (x) { return x; });
     if (!concl && !points.length && !basis) return null;
-    return { conclusion: concl, points: points, basis: basis, advice: advice };
+    return { conclusion: concl, points: points, basis: basis, yingqi: yingqi, risk: risk, advice: advice };
   }
 
   function renderInterpHtml(text) {
@@ -1412,6 +1427,12 @@
     }
     if (p.basis) {
       h.push('<details class="i-basis"><summary>依据 · 断卦逻辑（点开）</summary><div class="i-basis-body">' + mdToHtml(p.basis) + '</div></details>');
+    }
+    if (p.yingqi) {
+      h.push('<div class="i-block i-yq"><div class="i-block-label">应期</div><div class="i-block-body">' + mdToHtml(p.yingqi) + '</div></div>');
+    }
+    if (p.risk) {
+      h.push('<div class="i-block i-risk"><div class="i-block-label">风险</div><div class="i-block-body">' + mdToHtml(p.risk) + '</div></div>');
     }
     if (p.advice) {
       h.push('<div class="i-advice"><div class="i-advice-label">建议</div>' + mdToHtml(p.advice) + '</div>');

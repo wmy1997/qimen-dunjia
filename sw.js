@@ -1,6 +1,6 @@
 // 六爻 · 奇门排盘 Service Worker —— 离线缓存应用壳（仅 http(s)/localhost 生效，file:// 不注册）
 // 版本号每次发布必须递增：它决定缓存目录名，也是“是否已更新”的判据
-var CACHE = 'qimen-v19';
+var CACHE = 'qimen-v20';
 var ASSETS = [
   './',
   './index.html',

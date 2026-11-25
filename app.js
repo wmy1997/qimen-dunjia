@@ -43,6 +43,8 @@
   var currentHistoryId = null;
   // 追问（同一盘多轮）
   var FU_MAX = 5;
+  var MAX_OUT_TOKENS = 32000; // 输出上限：思考+正文共用，留足余量避免正文被思考挤空
+  var IDLE_MS = 45000;        // 流式空闲超时：超过这么久没有新数据即判中断
   var currentChat = [];      // [{role,content}] 不含 system
   var currentSysPrompt = '';
   var fuRounds = 0;
@@ -1531,7 +1533,12 @@
 
   function callDeepSeek(settings, messages, onReason, onContent, onError, onDone) {
     var s = settings || loadSettings();
-    var body = { model: s.model || DEFAULT_MODEL, messages: messages, stream: true };
+    var body = {
+      model: s.model || DEFAULT_MODEL,
+      messages: messages,
+      stream: true,
+      max_tokens: MAX_OUT_TOKENS
+    };
     if (s.effort && s.effort !== 'off') {
       body.reasoning_effort = s.effort;
     } else if (normalizeBase(s.baseUrl).indexOf('api.deepseek.com') >= 0) {
@@ -1540,31 +1547,62 @@
 
     var ctrl = new AbortController();
     var timedOut = false;
+    var idleOut = false;
+    var finished = false;
+    var noMaxRetry = false;
+    var finishReason = null;
     var timer = setTimeout(function () { timedOut = true; ctrl.abort(); }, 180000); // 总超时 3 分钟
+    var idleTimer = null;
+    function armIdle() {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(function () { idleOut = true; ctrl.abort(); }, IDLE_MS);
+    }
+    function stopTimers() {
+      clearTimeout(timer);
+      if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+    }
+    function done() {
+      if (finished) return;
+      finished = true;
+      stopTimers();
+      if (onDone) onDone({ finish: finishReason });
+    }
 
     fetch(apiEndpoint(s.baseUrl), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (s.apiKey || '') },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (s.apiKey || ''),
+        'Accept': 'text/event-stream'
+      },
       body: JSON.stringify(body),
       signal: ctrl.signal
     }).then(function (resp) {
       if (!resp.ok) {
-        clearTimeout(timer);
+        stopTimers();
         return resp.text().then(function (txt) {
           var msg = '请求失败 HTTP ' + resp.status;
           try {
             var j = JSON.parse(txt);
             if (j.error && j.error.message) msg = j.error.message;
           } catch (e) {}
+          // 个别接口不接受显式 max_tokens：去掉参数重试一次
+          if (resp.status === 400 && !noMaxRetry && /max_tokens|max_completion_tokens/i.test(msg)) {
+            noMaxRetry = true;
+            delete body.max_tokens;
+            return callDeepSeek(s, messages, onReason, onContent, onError, onDone);
+          }
           onError(msg);
         });
       }
       var reader = resp.body.getReader();
       var decoder = new TextDecoder();
       var buf = '';
+      armIdle();
       function pump() {
         return reader.read().then(function (r) {
-          if (r.done) { clearTimeout(timer); if (onDone) onDone(); return; }
+          if (r.done) { done(); return; }
+          armIdle();
           buf += decoder.decode(r.value, { stream: true });
           var lines = buf.split('\n');
           buf = lines.pop();
@@ -1574,10 +1612,12 @@
             if (line.indexOf('data: ') === 0) data = line.slice(6).trim();
             else if (line.indexOf('data:') === 0) data = line.slice(5).trim();
             if (data === null) continue;
-            if (data === '[DONE]') { clearTimeout(timer); if (onDone) onDone(); return; }
+            if (data === '[DONE]') { done(); return; }
             try {
               var obj = JSON.parse(data);
-              var delta = obj.choices && obj.choices[0] && obj.choices[0].delta;
+              var ch = obj.choices && obj.choices[0];
+              var delta = ch && ch.delta;
+              if (ch && ch.finish_reason) finishReason = ch.finish_reason;
               if (!delta) continue;
               if (delta.reasoning_content) onReason(delta.reasoning_content);
               if (delta.content) onContent(delta.content);
@@ -1588,14 +1628,19 @@
       }
       return pump();
     }).catch(function (e) {
-      clearTimeout(timer);
-      if (timedOut || (e && e.name === 'AbortError')) onError('请求超时（超过 3 分钟未完成），请检查网络后重试');
+      stopTimers();
+      if (finished) return;
+      finished = true;
+      if (idleOut) onError('响应中断：连续 ' + Math.round(IDLE_MS / 1000) + ' 秒没有收到数据，可能是网络或接口波动');
+      else if (timedOut || (e && e.name === 'AbortError')) onError('请求超时（超过 3 分钟未完成），请检查网络后重试');
       else onError('网络请求失败：' + (e && e.message ? e.message : e));
     });
   }
 
-  function startInterpretation() {
+  function startInterpretation(forceEffort) {
+    if (typeof forceEffort !== 'string') forceEffort = ''; // 直接绑 click 时会传 Event，必须忽略
     var s = loadSettings();
+    if (forceEffort) { s = JSON.parse(JSON.stringify(s)); s.effort = forceEffort; }
     var out = document.getElementById('interpOut');
     if (!out) return;
     var btnI = document.getElementById('btnInterp');
@@ -1679,17 +1724,37 @@
           hint = '<div class="interp-tip">请检查：API Key 是否复制完整（sk- 开头）、是否已充值（platform.deepseek.com 查看余额）。</div>';
         } else if (e2.indexOf('Insufficient') >= 0 || e2.indexOf('Balance') >= 0 || e2.indexOf('余额') >= 0) {
           hint = '<div class="interp-tip">账户余额不足，请到 platform.deepseek.com 充值后重试。</div>';
-        } else if (e2.indexOf('超时') >= 0 || e2.indexOf('网络') >= 0) {
-          hint = '<div class="interp-tip">网络异常：请检查能否访问 api.deepseek.com，稍后重试。</div>';
+        } else if (e2.indexOf('超时') >= 0 || e2.indexOf('网络') >= 0 || e2.indexOf('中断') >= 0) {
+          var host = '接口地址';
+          try { host = new URL(apiEndpoint(s.baseUrl)).host; } catch (e3) {}
+          hint = '<div class="interp-tip">网络异常：请确认能访问 ' + esc(host) + '，或稍后重试；长思考时若网络中断，降到 high 更快出结果。</div>';
         }
         answerBox.innerHTML = '<span class="interp-err">' + esc(err) + '</span>' + hint;
         if (btnI) { btnI.disabled = false; btnI.textContent = '🔮 AI 解读'; }
       },
-      function () {
+      function (meta) {
         clearInterval(elapsedTimer);
         if (rafTimer) { clearTimeout(rafTimer); rafTimer = null; }
-        if (answerBox && answerBuf) answerBox.innerHTML = renderInterpHtml(answerBuf);
         if (reasonBody) reasonBody.textContent = cleanCoT(reasonBuf);
+        var truncated = meta && meta.finish === 'length';
+        if (answerBox && answerBuf) {
+          answerBox.innerHTML = renderInterpHtml(answerBuf);
+          if (truncated) {
+            answerBox.insertAdjacentHTML('beforeend', '<div class="interp-tip">输出达到了本次长度上限，结尾可能被截断；需要完整结论可点「重试」。</div>');
+          }
+        } else if (answerBox) {
+          // 思考占满了输出预算（finish_reason=length）或模型没给正文：给出可操作提示，而不是留一片空白
+          var why = truncated
+            ? '本次推理把输出长度用完了（思考 ' + reasonBuf.length + ' 字），正文没能生成。'
+            : '模型只返回了思考过程，没有正文。';
+          answerBox.innerHTML =
+            '<div class="interp-err">没有拿到解读正文</div>' +
+            '<div class="interp-tip">' + esc(why) + '点下面按钮重试，会把思考强度降到 high 再要一次正文。</div>' +
+            '<div class="interp-retry"><button class="btn-fu" id="btnRetryInterp" type="button" data-effort="high">重试（思考强度 high）</button>' +
+            '<button class="btn-fu" id="btnRetryInterpMax" type="button" data-effort="max">重试（保持 max）</button></div>';
+          if (btnI) { btnI.disabled = false; btnI.textContent = '🔮 AI 解读'; }
+          return;
+        }
         currentChat = [
           { role: 'user', content: prompt },
           { role: 'assistant', content: answerBuf }
@@ -1779,10 +1844,20 @@
         if (btn) { btn.disabled = false; btn.textContent = '问'; }
         if (streamBox) streamBox.innerHTML = '<span class="interp-err">' + esc(err) + '</span>';
       },
-      function () {
+      function (meta) {
         fuBusy = false;
         if (timer) { clearTimeout(timer); timer = null; }
-        if (streamBox) { streamBox.innerHTML = mdToHtml(buf); streamBox.removeAttribute('id'); }
+        if (streamBox) {
+          if (buf) {
+            streamBox.innerHTML = mdToHtml(buf);
+            streamBox.removeAttribute('id');
+          } else {
+            fuRounds--; // 没拿到内容不消耗追问额度
+            var why2 = meta && meta.finish === 'length' ? '本次回答把输出长度用完了，没有返回正文' : '没有拿到回答';
+            streamBox.innerHTML = '<span class="interp-err">' + esc(why2) + '</span>';
+            streamBox.removeAttribute('id');
+          }
+        }
         currentChat.push({ role: 'user', content: text });
         currentChat.push({ role: 'assistant', content: buf });
         if (currentHistoryId && buf) {
@@ -1933,6 +2008,14 @@
     if (btnAgain) btnAgain.addEventListener('click', askAgain);
     initSettings();
     initFollowup();
+    var interpOutEl = document.getElementById('interpOut');
+    if (interpOutEl) {
+      interpOutEl.addEventListener('click', function (ev) {
+        var b = ev.target.closest ? ev.target.closest('[data-effort]') : null;
+        if (!b) return;
+        startInterpretation(b.getAttribute('data-effort'));
+      });
+    }
     initHistory();
     initAutoGrow();
 
@@ -1947,7 +2030,7 @@
 
   // —— 版本与自动更新 ——
   // 每次发布同时改这里（vNN · YYMMDD）和 sw.js 的 CACHE（qimen-vNN），两处必须一致
-  var APP_VER = 'v19 · 261123';
+  var APP_VER = 'v20 · 261125';
 
   function showUpdateToast(show) {
     var t = document.getElementById('updateToast');

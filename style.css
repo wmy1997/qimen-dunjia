@@ -607,3 +607,7 @@ input, textarea, select { font-size: 16px; }
 .update-toast .toast-x {
   background: transparent; color: var(--muted); border-color: var(--border); padding: 4px 8px;
 }
+
+/* 空正文/截断提示与重试 */
+.interp-retry { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.interp-retry .btn-fu { flex: 1 1 auto; min-width: 140px; }
